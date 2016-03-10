@@ -5,5 +5,6 @@ public class BetterThaniTunes {
 
     public static void main(String[] args) {
         view = new View();
+        System.out.println("Ayy");
     }
 }
