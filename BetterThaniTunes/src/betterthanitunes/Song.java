@@ -1,11 +1,8 @@
 package betterthanitunes;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 
 import com.mpatric.mp3agic.ID3v1;
-import com.mpatric.mp3agic.ID3v2;
 import com.mpatric.mp3agic.ID3v24Tag;
 import com.mpatric.mp3agic.Mp3File;
 import com.mpatric.mp3agic.InvalidDataException;
