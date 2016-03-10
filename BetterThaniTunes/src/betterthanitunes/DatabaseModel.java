@@ -91,6 +91,10 @@ public class DatabaseModel {
      * @return 2D array containing song info for table in GUI
      */
     public Object[][] returnAllSongs() {
+        
+        String[] genres = new String[2];
+        genres[0] = "Rap";
+        genres[1] = "Classical";
         try {
             stmt = conn.createStatement();
             
@@ -111,7 +115,7 @@ public class DatabaseModel {
                 songData[row][1] = results.getString(2);
                 songData[row][2] = results.getString(3); 
                 songData[row][3] = results.getString(4);
-                songData[row][4] = Integer.toString(results.getInt(5));
+                songData[row][4] = genres[results.getInt(5)];
                 songData[row][5] = results.getString(6);
                 songData[row][6] = results.getString(7);
             }
