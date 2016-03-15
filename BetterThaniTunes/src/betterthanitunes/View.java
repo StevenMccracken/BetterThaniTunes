@@ -67,6 +67,7 @@ class View extends JFrame {
         this.extensionFilter = new FileNameExtensionFilter("MP3 files","mp3");
         
         fileChooser.setFileFilter(extensionFilter);
+        fileChooser.setMultiSelectionEnabled(true);
         database.createConnection();
         
         // Add all songs in database to song table
@@ -129,8 +130,8 @@ class View extends JFrame {
         menuBar = new JMenuBar();
         JMenu file = new JMenu("File");
 
-        JMenuItem addSongMenuItem = new JMenuItem("Add a song");
-        JMenuItem deleteSongMenuItem = new JMenuItem("Delete selected song");
+        JMenuItem addSongMenuItem = new JMenuItem("Add songs");
+        JMenuItem deleteSongMenuItem = new JMenuItem("Delete selected songs");
         JMenuItem playIndividualSongMenuItem = new JMenuItem("Play a song not in the library");
         JMenuItem quitApplicationMenuItem = new JMenuItem("Quit application");
         
@@ -148,8 +149,8 @@ class View extends JFrame {
         
         // Create popup menu
         popupMenu = new JPopupMenu();
-        JMenuItem addSongPopupMenuItem = new JMenuItem("Add a song");
-        JMenuItem deleteSongPopupMenuItem = new JMenuItem("Delete selected song");
+        JMenuItem addSongPopupMenuItem = new JMenuItem("Add songs");
+        JMenuItem deleteSongPopupMenuItem = new JMenuItem("Delete selected songs");
         addSongPopupMenuItem.addActionListener(new addSongListener());
         deleteSongPopupMenuItem.addActionListener(new deleteSongListener());
         popupMenu.add(addSongPopupMenuItem);
@@ -159,8 +160,8 @@ class View extends JFrame {
         play = new JButton("Play");
         pause_resume = new JButton("Pause");
         stop = new JButton("Stop");
-        next = new JButton("Next song");
         previous = new JButton("Previous song");
+        next = new JButton("Next song");
         repeatPlaylist = new JCheckBox("Repeat Playlist");
         repeatSong = new JCheckBox("Repeat Song");
         
@@ -236,8 +237,8 @@ class View extends JFrame {
         if(wasSongInserted) {
             controller.addSong(song);
             Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),song.getGenre(),song.getComment()};
-            if((int)rowData[4] == -1) rowData[4] = "Rap";
-            else if((int)rowData[4] == 0) rowData[4] = "Unknown";
+            /*if((int)rowData[4] == -1) rowData[4] = "Rap";
+            else if((int)rowData[4] == 0) rowData[4] = "Unknown";*/
             tableModel.addRow(rowData);
         }
     }
@@ -255,12 +256,15 @@ class View extends JFrame {
         public void actionPerformed(ActionEvent e) {
             int returnValue = fileChooser.showOpenDialog(framePanel);
             if(returnValue == JFileChooser.APPROVE_OPTION) {
-                Song song = new Song(fileChooser.getSelectedFile().getAbsolutePath());
-                boolean wasSongInserted = database.insertSong(song);
-                if(wasSongInserted) {
-                    controller.addSong(song);
-                    Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),song.getGenre(),song.getComment()};
-                    tableModel.addRow(rowData);
+                File[] files = fileChooser.getSelectedFiles();
+                for(File file : files) {
+                    Song song = new Song(file.getAbsolutePath());
+                    boolean wasSongInserted = database.insertSong(song);
+                    if(wasSongInserted) {
+                        controller.addSong(song);
+                        Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),song.getGenre(),song.getComment()};
+                        tableModel.addRow(rowData);
+                    }
                 }
             }
         }
@@ -270,13 +274,15 @@ class View extends JFrame {
         // Add a confirmation notification later
         @Override
         public void actionPerformed(ActionEvent e) {
-            int row = songTable.getSelectedRow();
-            if(row != -1) {
-                Song song = controller.getSong(row);
-                boolean wasSongDeleted = database.deleteSong(song);
-                if(wasSongDeleted) {
-                    controller.deleteSong(row);
-                    tableModel.removeRow(row);
+            int rows[] = songTable.getSelectedRows();
+            if(rows.length > 0) {
+                for(int row = rows.length-1; row >= 0; row--) {
+                    Song song = controller.getSong(rows[row]);
+                    boolean wasSongDeleted = database.deleteSong(song);
+                    if(wasSongDeleted) {
+                        controller.deleteSong(rows[row]);
+                        tableModel.removeRow(rows[row]);
+                    } else System.out.println("Couldn't delete " + song.getTitle());
                 }
             }
         }
