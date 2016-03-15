@@ -78,7 +78,7 @@ public class DatabaseModel {
             stmt = conn.createStatement();
             String pathname = song.getPath();
             
-            stmt.execute("delete from " + tableName + " where pathname='" + pathname + "'");
+            stmt.execute("delete from " + tableName + " where path='" + pathname + "'");
             return true;
         } catch(SQLException e) {
             e.printStackTrace();
@@ -115,7 +115,7 @@ public class DatabaseModel {
                 songData[row][1] = results.getString(2);
                 songData[row][2] = results.getString(3); 
                 songData[row][3] = results.getString(4);
-                songData[row][4] = genres[results.getInt(5)];
+                songData[row][4] = results.getInt(5); //genres[results.getInt(5)];
                 songData[row][5] = results.getString(6);
                 songData[row][6] = results.getString(7);
             }
