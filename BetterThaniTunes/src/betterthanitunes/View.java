@@ -236,6 +236,8 @@ class View extends JFrame {
         if(wasSongInserted) {
             controller.addSong(song);
             Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),song.getGenre(),song.getComment()};
+            if((int)rowData[4] == -1) rowData[4] = "Rap";
+            else if((int)rowData[4] == 0) rowData[4] = "Unknown";
             tableModel.addRow(rowData);
         }
     }
