@@ -31,6 +31,8 @@ import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JTable;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
@@ -47,7 +49,7 @@ class View extends JFrame {
     JTextPane currentSong;
     JCheckBox repeatPlaylist, repeatSong;
     JButton play, stop, pause_resume, next, previous;
-    JPanel framePanel, controlPanel, songInfoPanel;
+    JPanel framePanel, controlPanel, songInfoPanel, sideBar;
     
     String[] cols = {"Title", "Artist", "Album", "Year", "Genre", "Comment"};
     Object[][] songData;
@@ -61,6 +63,8 @@ class View extends JFrame {
     
     public View() {
         super("BetterThaniTunes");
+        this.setPreferredSize(new Dimension(1000, 700));
+        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.controller = new Controller();
         this.database = new DatabaseModel();
         this.fileChooser = new JFileChooser();
@@ -68,7 +72,8 @@ class View extends JFrame {
         
         fileChooser.setFileFilter(extensionFilter);
         fileChooser.setMultiSelectionEnabled(true);
-        database.createConnection();
+        boolean connectionCreated = database.createConnection();
+        if(!connectionCreated) System.exit(0);
         
         // Add all songs in database to song table
         songData = database.returnAllSongs();
@@ -156,6 +161,11 @@ class View extends JFrame {
         popupMenu.add(addSongPopupMenuItem);
         popupMenu.add(deleteSongPopupMenuItem);
         
+        sideBar = new JPanel();
+        sideBar.add(new JTextArea("Library"));
+        sideBar.getComponent(0).setBackground(sideBar.getBackground());
+        sideBar.setPreferredSize(new Dimension((int)this.getPreferredSize().getWidth() - 875, (int)this.getPreferredSize().getHeight()));
+        
         // Instantiate control buttons
         play = new JButton("Play");
         pause_resume = new JButton("Pause");
@@ -193,6 +203,7 @@ class View extends JFrame {
         // Add song text pane to info panel
         songInfoPanel = new JPanel();
         songInfoPanel.add(currentSong);
+        currentSong.setBackground(songInfoPanel.getBackground());
         
         // Add current song playing area and player controls to bottom of gui
         JPanel bottomPanel = new JPanel(new BorderLayout());
@@ -204,13 +215,12 @@ class View extends JFrame {
         framePanel.setLayout(new BorderLayout());
         framePanel.add(menuBar, BorderLayout.NORTH);
         framePanel.add(scrollPane,BorderLayout.CENTER);
+        framePanel.add(sideBar, BorderLayout.WEST);
         framePanel.add(bottomPanel, BorderLayout.SOUTH);
         framePanel.addMouseListener(new popupMenuListener());
         
         // Set up gui frame window
         this.getContentPane().add(framePanel);
-        this.setPreferredSize(new Dimension(1000, 700));
-        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.pack();
         this.setVisible(true);
     }
@@ -236,7 +246,7 @@ class View extends JFrame {
         boolean wasSongInserted = database.insertSong(song);
         if(wasSongInserted) {
             controller.addSong(song);
-            Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),song.getGenre(),song.getComment()};
+            Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),controller.genres.get(song.getGenre()),song.getComment()};
             /*if((int)rowData[4] == -1) rowData[4] = "Rap";
             else if((int)rowData[4] == 0) rowData[4] = "Unknown";*/
             tableModel.addRow(rowData);
@@ -262,7 +272,7 @@ class View extends JFrame {
                     boolean wasSongInserted = database.insertSong(song);
                     if(wasSongInserted) {
                         controller.addSong(song);
-                        Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),song.getGenre(),song.getComment()};
+                        Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),controller.genres.get(song.getGenre()),song.getComment()};
                         tableModel.addRow(rowData);
                     }
                 }
