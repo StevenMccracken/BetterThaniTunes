@@ -31,8 +31,6 @@ import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JTable;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.JTree;
 import javax.swing.SwingUtilities;
@@ -55,7 +53,7 @@ class View extends JFrame {
     
     String[] tabeHeaders = {"Title", "Artist", "Album", "Year", "Genre", "Comment"};
     Object[][] songData;
-    DefaultTableModel tableModel = new DefaultTableModel();
+    DefaultTableModel tableModel;
     
     Controller controller;
     DatabaseModel database;
@@ -82,6 +80,147 @@ class View extends JFrame {
         setupSongArea();
         setupFramePanel();
         setupGuiWindow();
+    }
+    
+    // Displays which song is currently playing in GUI window
+    public void updatePlayer(Song song) {
+    	currentSong.setText(song.getTitle() + "\n" + song.getAlbum() + " by " + song.getArtist());
+        songInfoPanel.updateUI();
+    }
+    
+    // Clears GUI section that shows current song playing. Should only be called when song is stopped
+    public void clearPlayer() {
+    	currentSong.setText("");
+        songInfoPanel.updateUI();
+    }
+    
+    // Allows for pause/resume button to switch text between pause and resume
+    public void updatePauseResumeButton(String text) {
+    	pause_resume.setText(text);
+    }
+    
+    public void addSong(Song song) {
+        boolean wasSongInserted = database.insertSong(song);
+        if(wasSongInserted) {
+            controller.addSong(song);
+            Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),controller.genres.get(song.getGenre()),song.getComment()};
+            /*if((int)rowData[4] == -1) rowData[4] = "Rap";
+            else if((int)rowData[4] == 0) rowData[4] = "Unknown";*/
+            tableModel.addRow(rowData);
+        }
+    }
+    
+    class popupMenuListener extends MouseAdapter {
+        @Override
+        public void mouseReleased(MouseEvent e) {
+            if(SwingUtilities.isRightMouseButton(e))
+                popupMenu.show(e.getComponent(), e.getX(), e.getY());
+        }
+    }
+    
+    class addSongListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            int returnValue = fileChooser.showOpenDialog(framePanel);
+            if(returnValue == JFileChooser.APPROVE_OPTION) {
+                File[] files = fileChooser.getSelectedFiles();
+                for(File file : files) {
+                    Song song = new Song(file.getAbsolutePath());
+                    boolean wasSongInserted = database.insertSong(song);
+                    if(wasSongInserted) {
+                        controller.addSong(song);
+                        Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),controller.genres.get(song.getGenre()),song.getComment()};
+                        tableModel.addRow(rowData);
+                    }
+                }
+            }
+        }
+    }
+    
+    class deleteSongListener implements ActionListener {
+        // Add a confirmation notification later
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            int rows[] = songTable.getSelectedRows();
+            if(rows.length > 0) {
+                for(int row = rows.length-1; row >= 0; row--) {
+                    Song song = controller.getSong(rows[row]);
+                    boolean wasSongDeleted = database.deleteSong(song);
+                    if(wasSongDeleted) {
+                        controller.deleteSong(rows[row]);
+                        tableModel.removeRow(rows[row]);
+                    } else System.out.println("Couldn't delete " + song.getTitle());
+                }
+            }
+        }
+    }
+    
+    class playIndividualSongListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            int returnVal = fileChooser.showOpenDialog(new JPanel());
+            if(returnVal == JFileChooser.APPROVE_OPTION) {
+                Song song = new Song(fileChooser.getSelectedFile().getAbsolutePath());
+                controller.play(song, true);
+            }
+        }
+    }
+    
+    class quitButtonListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            database.shutdown();
+            System.exit(0);
+        }
+    }
+    class repeatPlaylistButtonListener implements ActionListener {
+    	@Override
+        public void actionPerformed(ActionEvent e) {
+            controller.updateRepeatPlaylistStatus(repeatPlaylist.isSelected());
+    	}
+    }
+    
+    class repeatSongButtonListener implements ActionListener {
+    	@Override
+        public void actionPerformed(ActionEvent e) {
+            controller.updateRepeatSongStatus(repeatSong.isSelected());
+    	}
+    }
+    
+    class playButtonListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if(songTable.getSelectedRow() != -1)
+                controller.play(controller.getSong(songTable.getSelectedRow()),false);
+            else System.out.println("Select a song first to play it!");
+        }
+    }
+    
+    class stopButtonListener implements ActionListener {
+    	@Override
+        public void actionPerformed(ActionEvent e) {
+            controller.stop();
+    	}
+    }
+    
+    class pause_resumeButtonListener implements ActionListener {
+    	@Override
+        public void actionPerformed(ActionEvent e) {
+            controller.pause_resume();
+    	}
+    }
+    
+    class nextSongButtonListener implements ActionListener {
+    	@Override
+        public void actionPerformed(ActionEvent e) {
+            controller.nextSong();
+    	}
+    }
+    
+    class previousSongButtonListener implements ActionListener {
+    	@Override
+        public void actionPerformed(ActionEvent e) {
+            controller.previousSong();
+    	}
     }
     
     public void setupFileChooser() {
@@ -256,145 +395,4 @@ class View extends JFrame {
         this.pack();
         this.setVisible(true);
     }
-    
-    // Displays which song is currently playing in GUI window
-    public void updatePlayer(Song song) {
-    	currentSong.setText(song.getTitle() + "\n" + song.getAlbum() + " by " + song.getArtist());
-        songInfoPanel.updateUI();
-    }
-    
-    // Clears GUI section that shows current song playing. Should only be called when song is stopped
-    public void clearPlayer() {
-    	currentSong.setText("");
-        songInfoPanel.updateUI();
-    }
-    
-    // Allows for pause/resume button to switch text between pause and resume
-    public void updatePauseResumeButton(String text) {
-    	pause_resume.setText(text);
-    }
-    
-    public void addSong(Song song) {
-        boolean wasSongInserted = database.insertSong(song);
-        if(wasSongInserted) {
-            controller.addSong(song);
-            Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),controller.genres.get(song.getGenre()),song.getComment()};
-            /*if((int)rowData[4] == -1) rowData[4] = "Rap";
-            else if((int)rowData[4] == 0) rowData[4] = "Unknown";*/
-            tableModel.addRow(rowData);
-        }
-    }
-    
-    class popupMenuListener extends MouseAdapter {
-        @Override
-        public void mouseReleased(MouseEvent e) {
-            if(SwingUtilities.isRightMouseButton(e))
-                popupMenu.show(e.getComponent(), e.getX(), e.getY());
-        }
-    }
-    
-    class addSongListener implements ActionListener {
-        @Override
-        public void actionPerformed(ActionEvent e) {
-            int returnValue = fileChooser.showOpenDialog(framePanel);
-            if(returnValue == JFileChooser.APPROVE_OPTION) {
-                File[] files = fileChooser.getSelectedFiles();
-                for(File file : files) {
-                    Song song = new Song(file.getAbsolutePath());
-                    boolean wasSongInserted = database.insertSong(song);
-                    if(wasSongInserted) {
-                        controller.addSong(song);
-                        Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),controller.genres.get(song.getGenre()),song.getComment()};
-                        tableModel.addRow(rowData);
-                    }
-                }
-            }
-        }
-    }
-    
-    class deleteSongListener implements ActionListener {
-        // Add a confirmation notification later
-        @Override
-        public void actionPerformed(ActionEvent e) {
-            int rows[] = songTable.getSelectedRows();
-            if(rows.length > 0) {
-                for(int row = rows.length-1; row >= 0; row--) {
-                    Song song = controller.getSong(rows[row]);
-                    boolean wasSongDeleted = database.deleteSong(song);
-                    if(wasSongDeleted) {
-                        controller.deleteSong(rows[row]);
-                        tableModel.removeRow(rows[row]);
-                    } else System.out.println("Couldn't delete " + song.getTitle());
-                }
-            }
-        }
-    }
-    
-    class playIndividualSongListener implements ActionListener {
-        public void actionPerformed(ActionEvent e) {
-            int returnVal = fileChooser.showOpenDialog(new JPanel());
-            if(returnVal == JFileChooser.APPROVE_OPTION) {
-                Song song = new Song(fileChooser.getSelectedFile().getAbsolutePath());
-                controller.play(song, true);
-            }
-        }
-    }
-    
-    class quitButtonListener implements ActionListener {
-        @Override
-        public void actionPerformed(ActionEvent e) {
-            database.shutdown();
-            System.exit(0);
-        }
-    }
-    class repeatPlaylistButtonListener implements ActionListener {
-    	@Override
-        public void actionPerformed(ActionEvent e) {
-            controller.updateRepeatPlaylistStatus(repeatPlaylist.isSelected());
-    	}
-    }
-    
-    class repeatSongButtonListener implements ActionListener {
-    	@Override
-        public void actionPerformed(ActionEvent e) {
-            controller.updateRepeatSongStatus(repeatSong.isSelected());
-    	}
-    }
-    
-    class playButtonListener implements ActionListener {
-        @Override
-        public void actionPerformed(ActionEvent e) {
-            if(songTable.getSelectedRow() != -1)
-                controller.play(controller.getSong(songTable.getSelectedRow()),false);
-            else System.out.println("Select a song first to play it!");
-        }
-    }
-    
-    class stopButtonListener implements ActionListener {
-    	@Override
-        public void actionPerformed(ActionEvent e) {
-            controller.stop();
-    	}
-    }
-    
-    class pause_resumeButtonListener implements ActionListener {
-    	@Override
-        public void actionPerformed(ActionEvent e) {
-            controller.pause_resume();
-    	}
-    }
-    
-    class nextSongButtonListener implements ActionListener {
-    	@Override
-        public void actionPerformed(ActionEvent e) {
-            controller.nextSong();
-    	}
-    }
-    
-    class previousSongButtonListener implements ActionListener {
-    	@Override
-        public void actionPerformed(ActionEvent e) {
-            controller.previousSong();
-    	}
-    }  
 }
