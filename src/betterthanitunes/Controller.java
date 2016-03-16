@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.PrintStream;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import javazoom.jlgui.basicplayer.BasicController;
 import javazoom.jlgui.basicplayer.BasicPlayer;
@@ -21,6 +22,8 @@ public class Controller implements BasicPlayerListener {
     private boolean isExternalSongPlaying = false;
     
     private ArrayList<Song> songs;
+    
+    public static ArrayList<String> genres = new ArrayList<>(Arrays.asList("Hip-Hop/Rap", "Classical", "Unknown"));
 	
     public Controller() {
     	out = System.out;

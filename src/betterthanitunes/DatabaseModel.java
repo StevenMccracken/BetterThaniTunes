@@ -18,13 +18,16 @@ public class DatabaseModel {
     /**
      * Method establishes connection to the database so statements can be executed
      */
-    public void createConnection() {
+    public boolean createConnection() {
         try {
             Class.forName(jdbcDriver);
             conn = DriverManager.getConnection(dbURL);
+            return true;
         }
         catch (ClassNotFoundException | SQLException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
+            System.out.println("\nUnable to establish connection");
+            return false;
         }
     }
     
@@ -91,10 +94,6 @@ public class DatabaseModel {
      * @return 2D array containing song info for table in GUI
      */
     public Object[][] returnAllSongs() {
-        
-        String[] genres = new String[2];
-        genres[0] = "Rap";
-        genres[1] = "Classical";
         try {
             stmt = conn.createStatement();
             
@@ -115,7 +114,8 @@ public class DatabaseModel {
                 songData[row][1] = results.getString(2);
                 songData[row][2] = results.getString(3); 
                 songData[row][3] = results.getString(4);
-                songData[row][4] = results.getInt(5); //genres[results.getInt(5)];
+                if(results.getInt(5) == -1) songData[row][4] = Controller.genres.get(2);
+                else songData[row][4] = Controller.genres.get(results.getInt(5));
                 songData[row][5] = results.getString(6);
                 songData[row][6] = results.getString(7);
             }
