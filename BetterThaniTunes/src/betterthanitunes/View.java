@@ -34,24 +34,26 @@ import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
+import javax.swing.JTree;
 import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.tree.DefaultMutableTreeNode;
 
 class View extends JFrame {
     JMenuBar menuBar;
     JPopupMenu popupMenu;
     JTable songTable;
-    JScrollPane scrollPane;
+    JScrollPane scrollPane, sidePanel;
     JTextPane currentSong;
     JCheckBox repeatPlaylist, repeatSong;
     JButton play, stop, pause_resume, next, previous;
-    JPanel framePanel, controlPanel, songInfoPanel, sideBar;
+    JPanel framePanel, controlPanel, songInfoPanel, bottomPanel;
     
-    String[] cols = {"Title", "Artist", "Album", "Year", "Genre", "Comment"};
+    String[] tabeHeaders = {"Title", "Artist", "Album", "Year", "Genre", "Comment"};
     Object[][] songData;
     DefaultTableModel tableModel = new DefaultTableModel();
     
@@ -63,25 +65,39 @@ class View extends JFrame {
     
     public View() {
         super("BetterThaniTunes");
-        this.setPreferredSize(new Dimension(1000, 700));
-        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        
         this.controller = new Controller();
         this.database = new DatabaseModel();
-        this.fileChooser = new JFileChooser();
-        this.extensionFilter = new FileNameExtensionFilter("MP3 files","mp3");
         
-        fileChooser.setFileFilter(extensionFilter);
-        fileChooser.setMultiSelectionEnabled(true);
         boolean connectionCreated = database.createConnection();
         if(!connectionCreated) System.exit(0);
         
+        setupFileChooser();
+        setupSongTable();
+        setupMenuBar();
+        setupPopupMenu();
+        setupSidePanel();
+        setupButtons();
+        setupControlPanel();
+        setupSongArea();
+        setupFramePanel();
+        setupGuiWindow();
+    }
+    
+    public void setupFileChooser() {
+        this.fileChooser = new JFileChooser();
+        this.extensionFilter = new FileNameExtensionFilter("MP3 Files", "mp3");
+        fileChooser.setFileFilter(extensionFilter);
+        fileChooser.setMultiSelectionEnabled(true);
+    }
+    
+    public void setupSongTable() {
         // Add all songs in database to song table
         songData = database.returnAllSongs();
-        for(int i = 0; i < songData.length; i++) {
+        for(int i = 0; i < songData.length; i++)
             controller.addSong(new Song((String)songData[i][6]));
-        }
         
-        tableModel = new DefaultTableModel(songData, cols);
+        tableModel = new DefaultTableModel(songData, tabeHeaders);
         songTable = new JTable(tableModel);
         songTable.addMouseListener(new popupMenuListener());
         
@@ -112,9 +128,8 @@ class View extends JFrame {
                             e.printStackTrace();
                         }
                     }
-                    else {
+                    else
                         dtde.rejectDrop();
-                    }
                 }
                 
                 @Override
@@ -128,13 +143,13 @@ class View extends JFrame {
                     dtde.acceptDrag(DnDConstants.ACTION_COPY_OR_MOVE);
                 }
             });
-        
         scrollPane = new JScrollPane(songTable);
-        
-        // Create menu bar with options
+    }
+    
+    public void setupMenuBar() {
         menuBar = new JMenuBar();
-        JMenu file = new JMenu("File");
-
+        JMenu fileMenu = new JMenu("File");
+        
         JMenuItem addSongMenuItem = new JMenuItem("Add songs");
         JMenuItem deleteSongMenuItem = new JMenuItem("Delete selected songs");
         JMenuItem playIndividualSongMenuItem = new JMenuItem("Play a song not in the library");
@@ -145,14 +160,15 @@ class View extends JFrame {
         playIndividualSongMenuItem.addActionListener(new playIndividualSongListener());
         quitApplicationMenuItem.addActionListener(new quitButtonListener());
 
-        file.add(addSongMenuItem);
-        file.add(deleteSongMenuItem);
-        file.add(playIndividualSongMenuItem);
-        file.add(new JSeparator());
-        file.add(quitApplicationMenuItem);
-        menuBar.add(file);
-        
-        // Create popup menu
+        fileMenu.add(addSongMenuItem);
+        fileMenu.add(deleteSongMenuItem);
+        fileMenu.add(playIndividualSongMenuItem);
+        fileMenu.add(new JSeparator());
+        fileMenu.add(quitApplicationMenuItem);
+        menuBar.add(fileMenu);
+    }
+    
+    public void setupPopupMenu() {
         popupMenu = new JPopupMenu();
         JMenuItem addSongPopupMenuItem = new JMenuItem("Add songs");
         JMenuItem deleteSongPopupMenuItem = new JMenuItem("Delete selected songs");
@@ -160,12 +176,20 @@ class View extends JFrame {
         deleteSongPopupMenuItem.addActionListener(new deleteSongListener());
         popupMenu.add(addSongPopupMenuItem);
         popupMenu.add(deleteSongPopupMenuItem);
+    }
+    
+    public void setupSidePanel() {
+        DefaultMutableTreeNode root = new DefaultMutableTreeNode("Root");
+        root.add(new DefaultMutableTreeNode("Library"));
+        root.add(new DefaultMutableTreeNode("Playlist"));
+        JTree tree = new JTree(root);
+        tree.setRootVisible(false);
         
-        sideBar = new JPanel();
-        sideBar.add(new JTextArea("Library"));
-        sideBar.getComponent(0).setBackground(sideBar.getBackground());
-        sideBar.setPreferredSize(new Dimension((int)this.getPreferredSize().getWidth() - 875, (int)this.getPreferredSize().getHeight()));
-        
+        sidePanel = new JScrollPane(tree);
+        sidePanel.setPreferredSize(new Dimension((int)(songTable.getPreferredSize().getWidth()/6), (int)songTable.getPreferredSize().getHeight()));
+    }
+    
+    public void setupButtons() {
         // Instantiate control buttons
         play = new JButton("Play");
         pause_resume = new JButton("Pause");
@@ -183,8 +207,9 @@ class View extends JFrame {
         previous.addActionListener(new previousSongButtonListener());
         repeatPlaylist.addActionListener(new repeatPlaylistButtonListener());
         repeatSong.addActionListener(new repeatSongButtonListener());
-        
-        // Add control buttons to control panel component
+    }
+    
+    public void setupControlPanel() {
         controlPanel = new JPanel();
         controlPanel.add(play);
         controlPanel.add(pause_resume);
@@ -193,33 +218,40 @@ class View extends JFrame {
         controlPanel.add(next);
         controlPanel.add(repeatSong);
         controlPanel.add(repeatPlaylist);
-        
+    }
+    
+    public void setupSongArea() {
         // Set up current song playing area
         currentSong = new JTextPane();
         StyledDocument doc = currentSong.getStyledDocument();
         SimpleAttributeSet center = new SimpleAttributeSet();
         StyleConstants.setAlignment(center, StyleConstants.ALIGN_CENTER);
         doc.setParagraphAttributes(0, doc.getLength(), center, false);
+        
         // Add song text pane to info panel
         songInfoPanel = new JPanel();
         songInfoPanel.add(currentSong);
         currentSong.setBackground(songInfoPanel.getBackground());
         
         // Add current song playing area and player controls to bottom of gui
-        JPanel bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.add(songInfoPanel, BorderLayout.NORTH);
         bottomPanel.add(controlPanel, BorderLayout.SOUTH);
-        
-        // Add all components to gui main panel
+    }
+    
+    public void setupFramePanel() {
         framePanel = new JPanel();
         framePanel.setLayout(new BorderLayout());
         framePanel.add(menuBar, BorderLayout.NORTH);
         framePanel.add(scrollPane,BorderLayout.CENTER);
-        framePanel.add(sideBar, BorderLayout.WEST);
+        framePanel.add(sidePanel, BorderLayout.WEST);
         framePanel.add(bottomPanel, BorderLayout.SOUTH);
         framePanel.addMouseListener(new popupMenuListener());
-        
-        // Set up gui frame window
+    }
+    
+    public void setupGuiWindow() {
+        this.setPreferredSize(new Dimension(1000, 700));
+        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.getContentPane().add(framePanel);
         this.pack();
         this.setVisible(true);
