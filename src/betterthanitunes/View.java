@@ -125,7 +125,7 @@ class View extends JFrame {
             if(returnValue == JFileChooser.APPROVE_OPTION) {
                 File[] files = fileChooser.getSelectedFiles();
                 for(File file : files) {
-                    Song song = new Song(file.getAbsolutePath());
+                    Song song = new Song(file.getPath());
                     boolean wasSongInserted = database.insertSong(song);
                     if(wasSongInserted) {
                         controller.addSong(song);
