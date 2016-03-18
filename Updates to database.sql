@@ -8,10 +8,10 @@ ALTER TABLE Playlists ADD CONSTRAINT
 
 CREATE TABLE SongPlaylist (
     playlistName VARCHAR(200) NOT NULL,
-    songPath VARCHAR(200) NOT NULL);
+    path VARCHAR(200) NOT NULL);
 
 ALTER TABLE SongPlaylist ADD CONSTRAINT Playlists_SongPlaylist_FK
     FOREIGN KEY (playlistName) REFERENCES Playlists (playlistName);
 
 ALTER TABLE SongPlaylist ADD CONSTRAINT Songs_SongPlaylist_FK
-    FOREIGN KEY (songPath) REFERENCES Songs (path);
+    FOREIGN KEY (path) REFERENCES Songs (path);

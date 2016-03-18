@@ -5,6 +5,7 @@ import java.io.PrintStream;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 
 import javazoom.jlgui.basicplayer.BasicController;
 import javazoom.jlgui.basicplayer.BasicPlayer;
@@ -21,7 +22,8 @@ public class Controller implements BasicPlayerListener {
     private boolean repeatSong = false, repeatPlaylist = false;
     private boolean isExternalSongPlaying = false;
     
-    private ArrayList<Song> songs;
+    private HashMap<String, Song> songs;
+    private ArrayList<Song> playOrder;
     
     public static ArrayList<String> genres = new ArrayList<>(Arrays.asList("Hip-Hop/Rap", "Classical", "Unknown"));
 	
@@ -34,24 +36,31 @@ public class Controller implements BasicPlayerListener {
     	controller = (BasicController)player;
     	this.setController(controller);
         
-        songs = new ArrayList<Song>();
+        songs = new HashMap<String, Song>();
+        playOrder = new ArrayList<Song>();
     }
     
     public void addSong(Song song) {
-    	songs.add(song);
+        songs.put(song.getPath(), song);
     }
     
     public ArrayList<Song> getAllSongs() {
-    	return songs;
+    	return new ArrayList<Song>(songs.values());
     }
     
-    public Song getSong(int index) {
-        return songs.get(index);
+    public Song getSong(String path) {
+        return songs.get(path);
     }
     
-    public void deleteSong(int index) {
-        if(songs.get(index) == songPlaying) stop();
-        songs.remove(index);
+    public void deleteSong(String path) {
+        if(songs.get(path) == songPlaying) stop();
+        songs.remove(path);
+    }
+    
+    private void updatePlayOrder() {
+        playOrder.clear();
+        for(Song song : songs.values())
+            playOrder.add(song);
     }
     
     /**
@@ -74,6 +83,7 @@ public class Controller implements BasicPlayerListener {
                 if(update) BetterThaniTunes.view.updatePauseResumeButton("Pause");
 
                 songPlaying = song;
+                updatePlayOrder();
                 isExternalSongPlaying = isSongExternal;
                 
                 // Updates GUI area that displays the song that is currently playing
@@ -149,8 +159,8 @@ public class Controller implements BasicPlayerListener {
             }
             // User doesn't have repeat song option selected, so play next song in library
             else {
-                int index = songs.indexOf(songPlaying);
-                if(index == (songs.size() - 1)) {
+                int index = playOrder.indexOf(songPlaying);
+                if(index == (playOrder.size() - 1)) {
                     if(repeatPlaylist) index = 0;
                     else {
                         stop();
@@ -159,7 +169,7 @@ public class Controller implements BasicPlayerListener {
                 }
                 else index++;
                 
-                Song song = songs.get(index);
+                Song song = playOrder.get(index);
                 
                 play(song, false);
                 songPlaying = song;
@@ -190,9 +200,9 @@ public class Controller implements BasicPlayerListener {
             }
             // User doesn't have repeat song option selected, so play previous song in library
             else {
-                int index = songs.indexOf(songPlaying);
+                int index = playOrder.indexOf(songPlaying);
                 if(index == 0) {
-                    if(repeatPlaylist) index = songs.size() - 1;
+                    if(repeatPlaylist) index = playOrder.size() - 1;
                     else {
                         stop();
                         return;
@@ -200,7 +210,7 @@ public class Controller implements BasicPlayerListener {
                 }
                 else index--;
                 
-                Song song = songs.get(index);
+                Song song = playOrder.get(index);
                 
                 play(song, false);
                 songPlaying = song;
