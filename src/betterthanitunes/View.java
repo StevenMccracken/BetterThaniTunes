@@ -17,6 +17,7 @@ import java.awt.event.MouseEvent;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.JButton;
@@ -26,6 +27,7 @@ import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
@@ -40,6 +42,8 @@ import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreeNode;
 
 class View extends JFrame {
     JMenuBar menuBar;
@@ -60,6 +64,10 @@ class View extends JFrame {
     
     JFileChooser fileChooser;
     FileNameExtensionFilter extensionFilter;
+    
+    JTree playlistTree;
+    DefaultTreeModel treeModel;
+    DefaultMutableTreeNode sidePanelTreeRoot;
     
     public View() {
         super("BetterThaniTunes");
@@ -82,31 +90,41 @@ class View extends JFrame {
         setupGuiWindow();
     }
     
-    // Displays which song is currently playing in GUI window
+    /**
+     * Method displays text on the GUI window showing what song is currently playing
+     * @param song 
+     */
     public void updatePlayer(Song song) {
     	currentSong.setText(song.getTitle() + "\n" + song.getAlbum() + " by " + song.getArtist());
         songInfoPanel.updateUI();
     }
     
-    // Clears GUI section that shows current song playing. Should only be called when song is stopped
+    /**
+     * Method clears the text pane displaying the current song playing
+     */
     public void clearPlayer() {
     	currentSong.setText("");
         songInfoPanel.updateUI();
     }
     
-    // Allows for pause/resume button to switch text between pause and resume
+    /**
+     * Method updates the text displaying on the pause/resume button
+     * @param text will change what the pause/resume button says
+     */
     public void updatePauseResumeButton(String text) {
     	pause_resume.setText(text);
     }
     
+    /**
+     * Method adds a song to the database and updates the Library table displaying all songs if the song was added
+     * @param song object containing tag information and file path
+     */
     public void addSong(Song song) {
-        boolean wasSongInserted = database.insertSong(song);
+        boolean wasSongInserted = database.insertSong(song, null); // Inserts song into database
         if(wasSongInserted) {
-            controller.addSong(song);
+            controller.addSong(song); // Adds song to player list
             Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),controller.genres.get(song.getGenre()),song.getComment()};
-            /*if((int)rowData[4] == -1) rowData[4] = "Rap";
-            else if((int)rowData[4] == 0) rowData[4] = "Unknown";*/
-            tableModel.addRow(rowData);
+            tableModel.addRow(rowData); // Adds song to Library table
         }
     }
     
@@ -126,7 +144,7 @@ class View extends JFrame {
                 File[] files = fileChooser.getSelectedFiles();
                 for(File file : files) {
                     Song song = new Song(file.getPath());
-                    boolean wasSongInserted = database.insertSong(song);
+                    boolean wasSongInserted = database.insertSong(song, null);
                     if(wasSongInserted) {
                         controller.addSong(song);
                         Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),controller.genres.get(song.getGenre()),song.getComment()};
@@ -138,7 +156,6 @@ class View extends JFrame {
     }
     
     class deleteSongListener implements ActionListener {
-        // Add a confirmation notification later
         @Override
         public void actionPerformed(ActionEvent e) {
             int rows[] = songTable.getSelectedRows();
@@ -156,11 +173,25 @@ class View extends JFrame {
     }
     
     class playIndividualSongListener implements ActionListener {
+        @Override
         public void actionPerformed(ActionEvent e) {
             int returnVal = fileChooser.showOpenDialog(new JPanel());
             if(returnVal == JFileChooser.APPROVE_OPTION) {
                 Song song = new Song(fileChooser.getSelectedFile().getAbsolutePath());
                 controller.play(song, true);
+            }
+        }
+    }
+    
+    class createPlaylistListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            String playlistName = JOptionPane.showInputDialog("Playlist name: ");
+            boolean wasInserted = database.insertPlaylist(playlistName);
+            if(wasInserted) {
+                DefaultMutableTreeNode playlist = new DefaultMutableTreeNode(playlistName);
+                ((DefaultMutableTreeNode)sidePanelTreeRoot.getChildAt(1)).add(playlist);
+                treeModel.reload(sidePanelTreeRoot.getChildAt(1));
             }
         }
     }
@@ -292,16 +323,20 @@ class View extends JFrame {
         JMenuItem addSongMenuItem = new JMenuItem("Add songs");
         JMenuItem deleteSongMenuItem = new JMenuItem("Delete selected songs");
         JMenuItem playIndividualSongMenuItem = new JMenuItem("Play a song not in the library");
+        JMenuItem createPlaylist = new JMenuItem("Create a playlist");
         JMenuItem quitApplicationMenuItem = new JMenuItem("Quit application");
         
         addSongMenuItem.addActionListener(new addSongListener());
         deleteSongMenuItem.addActionListener(new deleteSongListener());
         playIndividualSongMenuItem.addActionListener(new playIndividualSongListener());
+        createPlaylist.addActionListener(new createPlaylistListener());
         quitApplicationMenuItem.addActionListener(new quitButtonListener());
 
         fileMenu.add(addSongMenuItem);
         fileMenu.add(deleteSongMenuItem);
         fileMenu.add(playIndividualSongMenuItem);
+        fileMenu.add(new JSeparator());
+        fileMenu.add(createPlaylist);
         fileMenu.add(new JSeparator());
         fileMenu.add(quitApplicationMenuItem);
         menuBar.add(fileMenu);
@@ -318,14 +353,29 @@ class View extends JFrame {
     }
     
     public void setupSidePanel() {
-        DefaultMutableTreeNode root = new DefaultMutableTreeNode("Root");
-        root.add(new DefaultMutableTreeNode("Library"));
-        root.add(new DefaultMutableTreeNode("Playlist"));
-        JTree tree = new JTree(root);
-        tree.setRootVisible(false);
+        sidePanelTreeRoot = new DefaultMutableTreeNode("Root");
+        treeModel = new DefaultTreeModel(sidePanelTreeRoot);
         
-        sidePanel = new JScrollPane(tree);
-        sidePanel.setPreferredSize(new Dimension((int)(songTable.getPreferredSize().getWidth()/6), (int)songTable.getPreferredSize().getHeight()));
+        playlistTree = new JTree();
+        playlistTree.setRootVisible(false);
+        playlistTree.setModel(treeModel);
+        
+        DefaultMutableTreeNode library = new DefaultMutableTreeNode("Library");
+        DefaultMutableTreeNode playlists = new DefaultMutableTreeNode("Playlists");
+        
+        library.setAllowsChildren(false);
+        playlists.setAllowsChildren(true);
+        
+        ArrayList<String> playlistNames = database.returnAllPlaylists();
+        for(String playlistName : playlistNames)
+            playlists.add(new DefaultMutableTreeNode(playlistName));
+        
+        treeModel.insertNodeInto(library, sidePanelTreeRoot, 0);
+        treeModel.insertNodeInto(playlists, sidePanelTreeRoot, 1);
+        treeModel.nodeStructureChanged((TreeNode)treeModel.getRoot());
+        
+        sidePanel = new JScrollPane(playlistTree);
+        sidePanel.setPreferredSize(new Dimension((int)(songTable.getPreferredSize().getWidth()/4), (int)songTable.getPreferredSize().getHeight()));
     }
     
     public void setupButtons() {
