@@ -35,6 +35,8 @@ import javax.swing.JSeparator;
 import javax.swing.JTable;
 import javax.swing.JTextPane;
 import javax.swing.JTree;
+import javax.swing.RowSorter;
+import javax.swing.SortOrder;
 import javax.swing.SwingUtilities;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
@@ -43,6 +45,8 @@ import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.table.TableModel;
+import javax.swing.table.TableRowSorter;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreeNode;
@@ -262,16 +266,13 @@ class View extends JFrame {
         @Override
         public void actionPerformed(ActionEvent e) {
             if(songTable.getSelectedRow() != -1) {
-                ArrayList<String> strings = new ArrayList<String>();
-                Object[][] songData = database.returnAllSongs(currentPlaylist);
-                
-                for(int i = 0; i < songData.length; i++) {
-                    Song song = new Song((String)songData[i][6]);
-                    strings.add(songData[i][6].toString());
+                ArrayList<String> songPaths = new ArrayList<>();
+                for(int i = 0; i < songTable.getRowCount(); i++) {
+                    songPaths.add(songTable.getValueAt(i, 6).toString());
                 }
-                controller.updatePlayOrder(strings);
-                String path = (String)songTable.getValueAt(songTable.getSelectedRow(), 6);
+                controller.updatePlayOrder(songPaths);
                 
+                String path = songTable.getValueAt(songTable.getSelectedRow(), 6).toString();
                 controller.play(path, songTable.getSelectedRow());
             }
             else System.out.println("Select a song first to play it!");
@@ -371,6 +372,14 @@ class View extends JFrame {
         songTable.getColumnModel().getColumn(6).setResizable(false);
         scrollPane = new JScrollPane(songTable);
         currentPlaylist = "Library";
+        
+        TableRowSorter<TableModel> sorter = new TableRowSorter<>(songTable.getModel());
+        songTable.setRowSorter(sorter);
+
+        List<RowSorter.SortKey> sortKeys = new ArrayList<>(25);
+        sortKeys.add(new RowSorter.SortKey(4, SortOrder.ASCENDING));
+        sortKeys.add(new RowSorter.SortKey(0, SortOrder.ASCENDING));
+        sorter.setSortKeys(sortKeys);
     }
     
     public void setupMenuBar() {
