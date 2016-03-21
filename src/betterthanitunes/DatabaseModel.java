@@ -1,11 +1,11 @@
 package betterthanitunes;
 
+import java.util.ArrayList;
+import java.sql.ResultSet;
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
 
 public class DatabaseModel {
     private final String jdbcDriver = "org.apache.derby.jdbc.ClientDriver";
@@ -15,6 +15,7 @@ public class DatabaseModel {
     
     /**
      * Method establishes connection to the database so statements can be executed
+     * @return true if the connection was initialized. Otherwise, false
      */
     public boolean createConnection() {
         try {
@@ -35,7 +36,7 @@ public class DatabaseModel {
      * @return true if executing the prepared statement threw no exceptions. Otherwise, false
      */
     public boolean executeStatement(String query, Object[] args) {
-        PreparedStatement statement = null;
+        PreparedStatement statement;
         try {
             statement = connection.prepareStatement(query);
             for(int i = 0; i < args.length; i++) {
@@ -65,14 +66,15 @@ public class DatabaseModel {
     /**
      * Method inserts a Song object's String information into the database
      * @param song the song to be inserted
+     * @param playlistName the playlist to associate the song with
      * @return true if the insertion was successful. False if an error occurred
      */
     public boolean insertSong(Song song, String playlistName) {
-        String query = "";
+        String query;
         Object[] args;
-        int genreOverride = 0;
+        int genreOverride;
         
-        if(playlistName == null) {
+        if(playlistName.equals("Library")) {
             query = "INSERT INTO Songs VALUES (?,?,?,?,?,?,?)";
             if(song.getGenre() == -1) genreOverride = 2;
             else genreOverride = song.getGenre();
@@ -88,18 +90,24 @@ public class DatabaseModel {
         return wasInserted;
     }
     
+    /**
+     * Method deletes a song from the database
+     * @param song the song to be deleted
+     * @return true if the song was deleted. Otherwise, false
+     */
     public boolean deleteSong(Song song) {
         return executeStatement("DELETE FROM Songs WHERE path = ?", new Object[] {song.getPath()});
     }
     
     /**
      * Method returns all songs from the database
+     * @param playlistName the name of the playlist to find songs in
      * @return 2D array containing song info for table in GUI
      */
     public Object[][] returnAllSongs(String playlistName) {
-        PreparedStatement statement = null;
+        PreparedStatement statement;
         String additionalClause = "";
-        if(playlistName != null) additionalClause = " INNER JOIN SongPlaylist USING (path) INNER JOIN Playlists USING (playlistName)";
+        if(!playlistName.equals("Library")) additionalClause = " INNER JOIN SongPlaylist USING (path) INNER JOIN Playlists USING (playlistName) WHERE playlistName = '" + playlistName + "'";
         try {
             statement = connection.prepareStatement("SELECT COUNT(*) FROM Songs" + additionalClause);
             ResultSet results = statement.executeQuery();
@@ -110,7 +118,7 @@ public class DatabaseModel {
             Object[][] songData = new Object[tableSize][7];
             
             // Execute query again to actually get info from ResultSet
-            if(playlistName != null) statement = connection.prepareStatement("SELECT title, artist, album, yearCreated, genre, comment, path, playlistName FROM Songs" + additionalClause + " WHERE playlistName = '" + playlistName + "'");
+            if(!playlistName.equals("Library")) statement = connection.prepareStatement("SELECT title, artist, album, yearCreated, genre, comment, path, playlistName FROM Songs" + additionalClause);
             else statement = connection.prepareStatement("SELECT * FROM Songs");
             results = statement.executeQuery();
 
@@ -140,8 +148,8 @@ public class DatabaseModel {
      * @return ArrayList of strings that are the names of the playlists in the Playlists table
      */
     public ArrayList<String> returnAllPlaylists() {
-        ArrayList<String> playlists = new ArrayList<String>();
-        PreparedStatement statement = null;
+        ArrayList<String> playlists = new ArrayList<>();
+        PreparedStatement statement;
         try {
             statement = connection.prepareStatement("SELECT * FROM Playlists");
             ResultSet results = statement.executeQuery();
