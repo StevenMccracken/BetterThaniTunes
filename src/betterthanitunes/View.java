@@ -189,6 +189,8 @@ class View extends JFrame {
             if(rows.length > 0) {
                 for(int row = rows.length-1; row >= 0; row--) {
                     Song song = new Song(songTable.getValueAt(row, 6).toString());
+                    System.out.println(song.getPath());
+                    System.out.println(row);
                     boolean wasSongDeleted = database.deleteSong(song);
                     if(wasSongDeleted) {
                         controller.deleteSong(song);
@@ -214,14 +216,16 @@ class View extends JFrame {
         @Override
         public void actionPerformed(ActionEvent e) {
             String playlistName = JOptionPane.showInputDialog("Playlist name: ");
-            boolean wasInserted = database.insertPlaylist(playlistName);
-            if(wasInserted) {
-                DefaultMutableTreeNode playlist = new DefaultMutableTreeNode(playlistName);
-                ((DefaultMutableTreeNode)sidePanelTreeRoot.getChildAt(1)).add(playlist);
-                treeModel.reload(sidePanelTreeRoot.getChildAt(1));
+            if(playlistName != null) {
+                boolean wasInserted = database.insertPlaylist(playlistName);
+                if(wasInserted) {
+                    DefaultMutableTreeNode playlist = new DefaultMutableTreeNode(playlistName);
+                    ((DefaultMutableTreeNode)sidePanelTreeRoot.getChildAt(1)).add(playlist);
+                    treeModel.reload(sidePanelTreeRoot.getChildAt(1));
 
-                playlistTree.setSelectionPath(new TreePath(playlist.getPath()));
-                playlistTree.scrollPathToVisible(new TreePath(playlist.getPath()));
+                    playlistTree.setSelectionPath(new TreePath(playlist.getPath()));
+                    playlistTree.scrollPathToVisible(new TreePath(playlist.getPath()));
+                }
             }
         }
     }
