@@ -164,11 +164,11 @@ public class Controller implements BasicPlayerListener {
     }
     
     /**
-     * Method plays the next song in the library
+     * Method plays the next song in the library.
      */
-    public boolean nextSong() {
+    public void nextSong() {
         // If external song was playing, don't play anything after it ends
-    	if(currentIndex != -1 && isPlayerActive()) {
+    	if(currentIndex != -1 && !isPlayerStopped()) {
             // If user has option to repeat song selected, replay the same song
             if(repeatSong) {
                 try {
@@ -179,7 +179,6 @@ public class Controller implements BasicPlayerListener {
                     // Play the song
                     controller.open(new File(songPlaying));
                     controller.play();
-                    return true;
                 } catch(BasicPlayerException e) { e.printStackTrace(); }
             }
             // User doesn't have repeat song option selected, so play next song in library
@@ -188,17 +187,45 @@ public class Controller implements BasicPlayerListener {
                     if(repeatPlaylist) currentIndex = 0;
                     else {
                         stop();
-                        currentIndex = -1;
-                        return false;
+                        return;
                     }
                 }
                 else currentIndex++;
                 play(playOrder.get(currentIndex), currentIndex);
-                return true;
             }
         }
-        else if(currentIndex == -1) return false;
-        return false;
+    }
+    
+    /**
+     * Overridden method of nextSong method that is used solely to play the
+     * next song in playOrder once a song finishes playing.
+     * @param override useless parameter
+     * @return true if next song starts playing. False if end of playOrder is reached
+     */
+    private boolean nextSong(int override) {
+        if(repeatSong) {
+            try {
+                if(isPlayerPaused())
+                    BetterThaniTunes.view.updatePauseResumeButton("Pause");
+                
+                controller.open(new File(songPlaying));
+                controller.play();
+                return true;
+            } catch(BasicPlayerException e) { e.printStackTrace(); return false; }
+        }
+        else {
+            if(currentIndex == (playOrder.size() - 1)) {
+                if(repeatPlaylist) currentIndex = 0;
+                else {
+                    stop();
+                    return false;
+                }
+            }
+            else currentIndex++;
+            
+            play(playOrder.get(currentIndex), currentIndex);
+            return true;
+        }
     }
     
     /**
@@ -225,7 +252,6 @@ public class Controller implements BasicPlayerListener {
                     if(repeatPlaylist) currentIndex = playOrder.size() - 1;
                     else {
                         stop();
-                        currentIndex = -1;
                         return;
                     }
                 }
@@ -289,7 +315,7 @@ public class Controller implements BasicPlayerListener {
     	display("\nState updated: " + e.toString());
     	if(!songPlaying.equals("") && e.toString().substring(0,3).equals("EOM")) {
             while(!isPlayerStopped());
-            if(!nextSong()) BetterThaniTunes.view.clearPlayer();
+            if(!nextSong(0)) BetterThaniTunes.view.clearPlayer();
     	}
     }
     
@@ -300,10 +326,10 @@ public class Controller implements BasicPlayerListener {
     
     @Override
     public void progress(int bytesread, long ms, byte[] pcmdata, Map properties) {
-        Song song = new Song(songPlaying);
+        /*Song song = new Song(songPlaying);
         display("\nprogress: {microseconds: " + properties.get("mp3.position.microseconds") + "/" + song.getDuration()
                 + ", bytes: " + properties.get("mp3.position.byte") + "/" + song.getBytes()
-                + ", frames: " + properties.get("mp3.frame") + "/" + song.getFrames() + "}\r");
+                + ", frames: " + properties.get("mp3.frame") + "/" + song.getFrames() + "}\r");*/
     }
     
     @Override

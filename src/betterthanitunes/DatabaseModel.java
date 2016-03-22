@@ -60,7 +60,13 @@ public class DatabaseModel {
      * @return true if the playlist was inserted. False if the playlist name already exists
      */
     public boolean insertPlaylist(String playlistName) {
-        return executeStatement("INSERT INTO Playlists VALUES (?)", new Object[] {playlistName});
+        if(playlistName.equals("Library") || playlistName.equals("")) {
+            System.out.println("You cannot create a playlist called " + playlistName);
+            return false;
+        }
+        boolean wasInserted = executeStatement("INSERT INTO Playlists VALUES (?)", new Object[] {playlistName});
+        if(!wasInserted) System.out.println("\n" + playlistName + " already exists!");
+        return wasInserted;
     }
     
     /**
@@ -96,6 +102,23 @@ public class DatabaseModel {
      * @return true if the song was deleted. Otherwise, false
      */
     public boolean deleteSong(Song song) {
+        ArrayList<String> playlists = new ArrayList<>();
+        PreparedStatement statement;
+        try {
+            statement = connection.prepareStatement("SELECT playlistName FROM SongPlaylist WHERE path = ?");
+            statement.setString(1, song.getPath());
+            ResultSet results = statement.executeQuery();
+            
+            while(results.next()) 
+                playlists.add(results.getString("playlistName"));
+            
+        } catch(SQLException e) {
+            e.printStackTrace();
+        }
+        
+        for(String playlist : playlists)
+            executeStatement("DELETE FROM SongPlaylist WHERE playlistName = ? AND path = ?", new Object[] {playlist, song.getPath()});
+        
         return executeStatement("DELETE FROM Songs WHERE path = ?", new Object[] {song.getPath()});
     }
     

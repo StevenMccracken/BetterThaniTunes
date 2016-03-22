@@ -50,6 +50,7 @@ import javax.swing.table.TableRowSorter;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreeNode;
+import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
 class View extends JFrame {
@@ -213,17 +214,14 @@ class View extends JFrame {
         @Override
         public void actionPerformed(ActionEvent e) {
             String playlistName = JOptionPane.showInputDialog("Playlist name: ");
-            if(playlistName.equals("Library")) {
-                System.out.println("You cannot create a playlist with that name");
-            }
-            else {
-                boolean wasInserted = database.insertPlaylist(playlistName);
-                if(wasInserted) {
-                    DefaultMutableTreeNode playlist = new DefaultMutableTreeNode(playlistName);
-                    ((DefaultMutableTreeNode)sidePanelTreeRoot.getChildAt(1)).add(playlist);
-                    treeModel.reload(sidePanelTreeRoot.getChildAt(1));
-                }
-                else System.out.println("Unable to create playlist");
+            boolean wasInserted = database.insertPlaylist(playlistName);
+            if(wasInserted) {
+                DefaultMutableTreeNode playlist = new DefaultMutableTreeNode(playlistName);
+                ((DefaultMutableTreeNode)sidePanelTreeRoot.getChildAt(1)).add(playlist);
+                treeModel.reload(sidePanelTreeRoot.getChildAt(1));
+
+                playlistTree.setSelectionPath(new TreePath(playlist.getPath()));
+                playlistTree.scrollPathToVisible(new TreePath(playlist.getPath()));
             }
         }
     }
@@ -373,13 +371,13 @@ class View extends JFrame {
         scrollPane = new JScrollPane(songTable);
         currentPlaylist = "Library";
         
-        TableRowSorter<TableModel> sorter = new TableRowSorter<>(songTable.getModel());
+        /*TableRowSorter<TableModel> sorter = new TableRowSorter<>(songTable.getModel());
         songTable.setRowSorter(sorter);
 
         List<RowSorter.SortKey> sortKeys = new ArrayList<>(25);
         sortKeys.add(new RowSorter.SortKey(4, SortOrder.ASCENDING));
         sortKeys.add(new RowSorter.SortKey(0, SortOrder.ASCENDING));
-        sorter.setSortKeys(sortKeys);
+        sorter.setSortKeys(sortKeys);*/
     }
     
     public void setupMenuBar() {

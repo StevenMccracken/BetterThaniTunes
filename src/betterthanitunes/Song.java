@@ -125,7 +125,8 @@ public class Song {
     }
     
     public int getGenre() {
-        return tag.getGenre();
+        if(tag.getGenre() == -1) return 0;
+        else return tag.getGenre();
     }
     
     public String getComment() {
