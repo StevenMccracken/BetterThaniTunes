@@ -19,6 +19,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -55,7 +56,7 @@ import javax.swing.tree.TreeSelectionModel;
 
 class View extends JFrame {
     JMenuBar menuBar;
-    JPopupMenu popupMenu;
+    JPopupMenu songTablePopupMenu, sidePanelPopupMenu;
     JTable songTable;
     JScrollPane scrollPane, sidePanel;
     JTextPane currentSong;
@@ -91,7 +92,7 @@ class View extends JFrame {
         setupFileChooser();
         setupSongTable();
         setupMenuBar();
-        setupPopupMenu();
+        setupSongTablePopupMenu();
         setupSidePanel();
         setupButtons();
         setupControlPanel();
@@ -133,7 +134,7 @@ class View extends JFrame {
         boolean wasSongInserted = database.insertSong(song, "Library"); // Inserts song into database
         if(wasSongInserted) {
             controller.addSong(song); // Adds song to player list
-            Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),controller.genres.get(song.getGenre()),song.getComment()};
+            Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),controller.genres.get(song.getGenre()),song.getComment(),song.getPath()};
             tableModel.addRow(rowData); // Adds song to Library table
         }
     }
@@ -155,11 +156,11 @@ class View extends JFrame {
         tableModel.fireTableDataChanged();
     }
     
-    class popupMenuListener extends MouseAdapter {
+    class songTablePopupMenuListener extends MouseAdapter {
         @Override
         public void mouseReleased(MouseEvent e) {
             if(SwingUtilities.isRightMouseButton(e))
-                popupMenu.show(e.getComponent(), e.getX(), e.getY());
+                songTablePopupMenu.show(e.getComponent(), e.getX(), e.getY());
         }
     }
     
@@ -188,9 +189,7 @@ class View extends JFrame {
             int rows[] = songTable.getSelectedRows();
             if(rows.length > 0) {
                 for(int row = rows.length-1; row >= 0; row--) {
-                    Song song = new Song(songTable.getValueAt(row, 6).toString());
-                    System.out.println(song.getPath());
-                    System.out.println(row);
+                    Song song = new Song(songTable.getValueAt(rows[row], 6).toString());
                     boolean wasSongDeleted = database.deleteSong(song);
                     if(wasSongDeleted) {
                         controller.deleteSong(song);
@@ -198,6 +197,45 @@ class View extends JFrame {
                     } else System.out.println("Couldn't delete " + song.getTitle());
                 }
             }
+        }
+    }
+    
+    class sidePanelPopupMenuListener implements MouseListener {
+        @Override
+        public void mouseClicked(MouseEvent e) {
+
+            if (SwingUtilities.isRightMouseButton(e)) {
+                int row = playlistTree.getClosestRowForLocation(e.getX(), e.getY());
+                playlistTree.setSelectionRow(row);
+                sidePanelPopupMenu.show(e.getComponent(), e.getX(), e.getY());
+            }
+        }
+        
+        @Override
+        public void mouseExited(MouseEvent e) {
+            System.out.println("Mouse exited");
+        }
+
+        @Override
+        public void mousePressed(MouseEvent e) {
+            System.out.println("Mouse pressed");
+        }
+
+        @Override
+        public void mouseReleased(MouseEvent e) {
+            System.out.println("Mouse released");
+        }
+
+        @Override
+        public void mouseEntered(MouseEvent e) {
+            System.out.println("Mouse entered");
+        }
+    }
+    
+    class deletePlaylistListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            System.out.println("ayy");
         }
     }
     
@@ -325,7 +363,7 @@ class View extends JFrame {
         
         tableModel = new DefaultTableModel(songData, tableHeaders);
         songTable = new JTable(tableModel);
-        songTable.addMouseListener(new popupMenuListener());
+        songTable.addMouseListener(new songTablePopupMenuListener());
         
         // Add drag and drop functionality to song table
         songTable.setDropTarget(
@@ -410,14 +448,21 @@ class View extends JFrame {
         menuBar.add(fileMenu);
     }
     
-    public void setupPopupMenu() {
-        popupMenu = new JPopupMenu();
-        JMenuItem addSongPopupMenuItem = new JMenuItem("Add songs");
-        JMenuItem deleteSongPopupMenuItem = new JMenuItem("Delete selected songs");
-        addSongPopupMenuItem.addActionListener(new addSongListener());
-        deleteSongPopupMenuItem.addActionListener(new deleteSongListener());
-        popupMenu.add(addSongPopupMenuItem);
-        popupMenu.add(deleteSongPopupMenuItem);
+    public void setupSongTablePopupMenu() {
+        songTablePopupMenu = new JPopupMenu();
+        JMenuItem addSong = new JMenuItem("Add songs");
+        JMenuItem deleteSong = new JMenuItem("Delete selected songs");
+        addSong.addActionListener(new addSongListener());
+        deleteSong.addActionListener(new deleteSongListener());
+        songTablePopupMenu.add(addSong);
+        songTablePopupMenu.add(deleteSong);
+    }
+    
+    public void setupSidePanelTablePopupMenu() {
+        sidePanelPopupMenu = new JPopupMenu();
+        JMenuItem deletePlaylist = new JMenuItem("Delete playlist");
+        deletePlaylist.addActionListener(new deletePlaylistListener());
+        sidePanelPopupMenu.add(deletePlaylist);
     }
     
     public void setupSidePanel() {
@@ -446,6 +491,8 @@ class View extends JFrame {
         
         sidePanel = new JScrollPane(playlistTree);
         sidePanel.setPreferredSize(new Dimension((int)(songTable.getPreferredSize().getWidth()/4), (int)songTable.getPreferredSize().getHeight()));
+        
+        sidePanel.addMouseListener(new sidePanelPopupMenuListener());
     }
     
     public void setupButtons() {
@@ -505,7 +552,7 @@ class View extends JFrame {
         framePanel.add(scrollPane,BorderLayout.CENTER);
         framePanel.add(sidePanel, BorderLayout.WEST);
         framePanel.add(bottomPanel, BorderLayout.SOUTH);
-        framePanel.addMouseListener(new popupMenuListener());
+        framePanel.addMouseListener(new songTablePopupMenuListener());
     }
     
     public void setupGuiWindow() {
