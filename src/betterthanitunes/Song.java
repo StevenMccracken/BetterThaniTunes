@@ -1,5 +1,6 @@
 package betterthanitunes;
 
+import java.io.File;
 import java.io.IOException;
 
 import com.mpatric.mp3agic.ID3v1;
@@ -8,7 +9,6 @@ import com.mpatric.mp3agic.Mp3File;
 import com.mpatric.mp3agic.InvalidDataException;
 import com.mpatric.mp3agic.NotSupportedException;
 import com.mpatric.mp3agic.UnsupportedTagException;
-import java.io.File;
 
 public class Song {
     private Mp3File file;
@@ -40,6 +40,9 @@ public class Song {
         }
     }
     
+    /**
+     * Method ensures all tags are not null or invalid values.
+     */
     public void checkTags() {
         boolean changesMade = false;
         if(tag.getTitle() == "" || tag.getTitle() == null) {
@@ -93,7 +96,7 @@ public class Song {
     }
 
     // Method returns total bytes of mp3 file
-    public Long getBytes() {
+    public long getBytes() {
         return file.getLength();
     }
 
@@ -122,7 +125,8 @@ public class Song {
     }
     
     public int getGenre() {
-        return tag.getGenre();
+        if(tag.getGenre() == -1) return 0;
+        else return tag.getGenre();
     }
     
     public String getComment() {
