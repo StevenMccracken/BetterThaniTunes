@@ -69,6 +69,12 @@ public class DatabaseModel {
         return wasInserted;
     }
     
+    public boolean deletePlaylist(String playlistName) {
+        Object[] playlist = {playlistName};
+        executeStatement("DELETE FROM SongPlaylist WHERE playlistName = ?", playlist);
+        return executeStatement("DELETE FROM Playlists WHERE playlistName = ?", playlist);
+    }
+    
     /**
      * Method inserts a Song object's String information into the database
      * @param song the song to be inserted
@@ -78,13 +84,10 @@ public class DatabaseModel {
     public boolean insertSong(Song song, String playlistName) {
         String query;
         Object[] args;
-        int genreOverride;
         
         if(playlistName.equals("Library")) {
             query = "INSERT INTO Songs VALUES (?,?,?,?,?,?,?)";
-            if(song.getGenre() == -1) genreOverride = 2;
-            else genreOverride = song.getGenre();
-            args = new Object[] {song.getTitle(), song.getArtist(), song.getAlbum(), song.getYear(), genreOverride, song.getComment(), song.getPath()};
+            args = new Object[] {song.getTitle(), song.getArtist(), song.getAlbum(), song.getYear(), song.getGenre(), song.getComment(), song.getPath()};
         }
         else {
             query = "INSERT INTO SongPlaylist VALUES (?,?)";
@@ -99,27 +102,49 @@ public class DatabaseModel {
     /**
      * Method deletes a song from the database
      * @param song the song to be deleted
+     * @param playlistName the playlist that the song will be deleted from
      * @return true if the song was deleted. Otherwise, false
      */
-    public boolean deleteSong(Song song) {
-        ArrayList<String> playlists = new ArrayList<>();
+    public boolean deleteSong(Song song, String playlistName) {
         PreparedStatement statement;
-        try {
-            statement = connection.prepareStatement("SELECT playlistName FROM SongPlaylist WHERE path = ?");
-            statement.setString(1, song.getPath());
-            ResultSet results = statement.executeQuery();
-            
-            while(results.next()) 
-                playlists.add(results.getString("playlistName"));
-            
-        } catch(SQLException e) {
-            e.printStackTrace();
+        if(playlistName.equals("Library")) {
+            ArrayList<String> playlists = new ArrayList<>();
+            try {
+                statement = connection.prepareStatement("SELECT playlistName FROM SongPlaylist WHERE path = ?");
+                statement.setString(1, song.getPath());
+                ResultSet results = statement.executeQuery();
+
+                while(results.next()) 
+                    playlists.add(results.getString("playlistName"));
+
+            } catch(SQLException e) {
+                e.printStackTrace();
+            }
+
+            for(String playlist : playlists)
+                executeStatement("DELETE FROM SongPlaylist WHERE playlistName = ? AND path = ?", new Object[] {playlist, song.getPath()});
+
+            return executeStatement("DELETE FROM Songs WHERE path = ?", new Object[] {song.getPath()});
         }
-        
-        for(String playlist : playlists)
-            executeStatement("DELETE FROM SongPlaylist WHERE playlistName = ? AND path = ?", new Object[] {playlist, song.getPath()});
-        
-        return executeStatement("DELETE FROM Songs WHERE path = ?", new Object[] {song.getPath()});
+        else {
+            try {
+                statement = connection.prepareStatement("SELECT COUNT(*) FROM SongPlaylist WHERE playlistName = ? AND path = ?");
+                statement.setString(1, playlistName);
+                statement.setString(2, song.getPath());
+                ResultSet results = statement.executeQuery();
+                
+                int numSongs = 0;
+                while(results.next()) numSongs = results.getInt(1);
+                
+                executeStatement("DELETE FROM SongPlaylist WHERE playlistName = ? AND path = ?", new Object[] {playlistName, song.getPath()});
+                for(int i = 0; i < numSongs-1; i++)
+                    executeStatement("INSERT INTO SongPlaylist VALUES (?,?)", new Object[] {playlistName, song.getPath()});
+                return true;
+            } catch(SQLException e) {
+                e.printStackTrace();
+                return false;
+            }
+        }
     }
     
     /**
@@ -181,16 +206,5 @@ public class DatabaseModel {
                 playlists.add(results.getString("playlistName"));
         } catch(SQLException e) { e.printStackTrace(); }
         return playlists;
-    }
-    
-    /**
-     * Method disconnects from the database
-     */
-    public void shutdown() {
-        try {
-            if(connection != null) connection.close();
-        } catch(SQLException e) {
-            e.printStackTrace();
-        }
     }
 }

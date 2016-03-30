@@ -25,6 +25,8 @@ public class Controller implements BasicPlayerListener {
     private ArrayList<String> playOrder;
     
     public static ArrayList<String> genres;
+    
+    private DatabaseModel database;
 	
     public Controller() {
     	out = System.out;
@@ -45,16 +47,37 @@ public class Controller implements BasicPlayerListener {
         genres.add("Hip-Hop");
         genres.add("Classical");
         genres.add("Unknown");
+        
+        this.database = new DatabaseModel();
+        boolean connectionCreated = database.createConnection();
+        if(!connectionCreated) System.exit(0);
+        
+        initializeSongs();
     }
     
     /**
      * Method maps a song's path to it's Song object so it can be referred to by any playlist
      * @param song the song to be added
+     * @param playlistName the playlist for the song to be added to
+     * @return true if the song is added. Otherwise, false
      */
-    public void addSong(Song song) {
-        if(!songs.containsKey(song.getPath()))
-            songs.put(song.getPath(), song);
-        else System.out.println("Song already exists");
+    public boolean addSong(Song song, String playlistName) {
+        if(database.insertSong(song, playlistName)) {
+            if(playlistName.equals("Library"))
+                songs.put(song.getPath(), song);
+            return true;
+        }
+        return false;
+    }
+    
+    private void initializeSongs() {
+        Object[][] songData = returnAllSongs("Library");
+        for(int i = 0; i < songData.length; i++)
+            songs.put(songData[i][6].toString(), new Song(songData[i][6].toString()));
+    }
+    
+    public Object[][] returnAllSongs(String playlistName) {
+        return database.returnAllSongs(playlistName);
     }
     
     /**
@@ -77,10 +100,30 @@ public class Controller implements BasicPlayerListener {
     /**
      * Deletes a song from the library
      * @param song the song to be deleted
+     * @return true if the song is deleted. Otherwise, false
      */
-    public void deleteSong(Song song) {
+    public boolean deleteSong(Song song, String playlistName) {
         if(song.getPath().equals(songPlaying)) stop();
-        songs.remove(song.getPath());
+        if(database.deleteSong(song, playlistName)) {
+            if(!playlistName.equals("Library"))
+                songs.remove(song.getPath());
+            return true;
+        }
+        return false;
+    }
+    
+    public boolean addPlaylist(String playlistName) {
+        if(database.insertPlaylist(playlistName)) return true;
+        return false;
+    }
+    
+    public boolean deletePlaylist(String playlistName) {
+        if(database.deletePlaylist(playlistName)) return true;
+        return false;
+    }
+    
+    public ArrayList<String> returnAllPlaylists() {
+        return database.returnAllPlaylists();
     }
     
     /**
