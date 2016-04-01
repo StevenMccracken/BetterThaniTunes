@@ -7,10 +7,13 @@ import java.sql.SQLException;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 
+/**
+ * Class represents the database that holds all songs in a user's library,
+ * as well as the organization of those songs in user-created playlists.
+ * @author Steven McCracken
+ * @author Mark Saavedra
+ */
 public class DatabaseModel {
-    private final String jdbcDriver = "org.apache.derby.jdbc.ClientDriver";
-    private String dbURL = "jdbc:derby://localhost:1527/BetterThaniTunes;create=true";
-    
     private Connection connection = null;
     
     /**
@@ -19,12 +22,12 @@ public class DatabaseModel {
      */
     public boolean createConnection() {
         try {
-            Class.forName(jdbcDriver);
-            connection = DriverManager.getConnection(dbURL);
+            Class.forName("org.apache.derby.jdbc.ClientDriver");
+            connection = DriverManager.getConnection("jdbc:derby://localhost:1527/BetterThaniTunes;create=true");
             return true;
         }
         catch (ClassNotFoundException | SQLException e) {
-            System.out.println("\nUnable to establish connection");
+            System.out.println("\nUnable to connect to BetterThaniTunes database");
             return false;
         }
     }
@@ -69,6 +72,11 @@ public class DatabaseModel {
         return wasInserted;
     }
     
+    /**
+     * Method deletes a playlist from the Playlists table
+     * @param playlistName the name of the playlist to be deleted
+     * @return true if the playlist was deleted. Otherwise, false
+     */
     public boolean deletePlaylist(String playlistName) {
         Object[] playlist = {playlistName};
         executeStatement("DELETE FROM SongPlaylist WHERE playlistName = ?", playlist);
@@ -82,19 +90,55 @@ public class DatabaseModel {
      * @return true if the insertion was successful. False if an error occurred
      */
     public boolean insertSong(Song song, String playlistName) {
+        int id;
         String query;
         Object[] args;
+        boolean songExistsInLibrary = false;
         
         if(playlistName.equals("Library")) {
             query = "INSERT INTO Songs VALUES (?,?,?,?,?,?,?)";
             args = new Object[] {song.getTitle(), song.getArtist(), song.getAlbum(), song.getYear(), song.getGenre(), song.getComment(), song.getPath()};
         }
         else {
-            query = "INSERT INTO SongPlaylist VALUES (?,?)";
-            args = new Object[] {playlistName, song.getPath()};
+            PreparedStatement statement;
+            try {
+                statement = connection.prepareStatement("SELECT path FROM Songs WHERE path = ?");
+                statement.setString(1, song.getPath());
+                ResultSet results = statement.executeQuery();
+                if(results.next()) songExistsInLibrary = true;
+            } catch(SQLException e) {
+                e.printStackTrace();
+                return false;
+            }
+            
+            if(!songExistsInLibrary) {
+                query = "INSERT INTO Songs VALUES (?,?,?,?,?,?,?)";
+                args = new Object[] {song.getTitle(), song.getArtist(), song.getAlbum(), song.getYear(), song.getGenre(), song.getComment(), song.getPath()};
+                executeStatement(query, args);
+                id = 0;
+            }
+            else {
+                try {
+                    statement = connection.prepareStatement("SELECT MAX(id) AS ID FROM SongPlaylist WHERE playlistName = ? AND path = ?");
+                    statement.setString(1, playlistName);
+                    statement.setString(2, song.getPath());
+                    ResultSet results = statement.executeQuery();
+                    results.next();
+                    if(results.getObject("ID") == null) id = 0;
+                    else id = results.getInt("ID") + 1;
+                } catch(SQLException e) {
+                    e.printStackTrace();
+                    return false;
+                }
+                
+            }
+            
+            query = "INSERT INTO SongPlaylist VALUES (?,?,?)";
+            args = new Object[] {playlistName, song.getPath(), id};
         }
         
         boolean wasInserted = executeStatement(query, args);
+        if(songExistsInLibrary) return false;
         if (!wasInserted) System.out.println("\nUnable to add song");
         return wasInserted;
     }
@@ -103,9 +147,10 @@ public class DatabaseModel {
      * Method deletes a song from the database
      * @param song the song to be deleted
      * @param playlistName the playlist that the song will be deleted from
+     * @param id the unique id of a song in a playlist
      * @return true if the song was deleted. Otherwise, false
      */
-    public boolean deleteSong(Song song, String playlistName) {
+    public boolean deleteSong(Song song, String playlistName, int id) {
         PreparedStatement statement;
         if(playlistName.equals("Library")) {
             ArrayList<String> playlists = new ArrayList<>();
@@ -127,23 +172,8 @@ public class DatabaseModel {
             return executeStatement("DELETE FROM Songs WHERE path = ?", new Object[] {song.getPath()});
         }
         else {
-            try {
-                statement = connection.prepareStatement("SELECT COUNT(*) FROM SongPlaylist WHERE playlistName = ? AND path = ?");
-                statement.setString(1, playlistName);
-                statement.setString(2, song.getPath());
-                ResultSet results = statement.executeQuery();
-                
-                int numSongs = 0;
-                while(results.next()) numSongs = results.getInt(1);
-                
-                executeStatement("DELETE FROM SongPlaylist WHERE playlistName = ? AND path = ?", new Object[] {playlistName, song.getPath()});
-                for(int i = 0; i < numSongs-1; i++)
-                    executeStatement("INSERT INTO SongPlaylist VALUES (?,?)", new Object[] {playlistName, song.getPath()});
-                return true;
-            } catch(SQLException e) {
-                e.printStackTrace();
-                return false;
-            }
+            executeStatement("DELETE FROM SongPlaylist WHERE playlistName = ? AND path = ? AND id = ?", new Object[] {playlistName, song.getPath(), id});
+            return true;
         }
     }
     
@@ -163,10 +193,10 @@ public class DatabaseModel {
             while(results.next()) tableSize = results.getInt(1);
             
             // Create 2D table to be returned with correct size
-            Object[][] songData = new Object[tableSize][7];
+            Object[][] songData = new Object[tableSize][8];
             
             // Execute query again to actually get info from ResultSet
-            if(!playlistName.equals("Library")) statement = connection.prepareStatement("SELECT title, artist, album, yearCreated, genre, comment, path, playlistName FROM Songs" + additionalClause);
+            if(!playlistName.equals("Library")) statement = connection.prepareStatement("SELECT title, artist, album, yearCreated, genre, comment, path, id FROM Songs" + additionalClause);
             else statement = connection.prepareStatement("SELECT * FROM Songs");
             results = statement.executeQuery();
 
@@ -180,6 +210,8 @@ public class DatabaseModel {
                 else songData[row][4] = Controller.genres.get(results.getInt(5));
                 songData[row][5] = results.getString(6);
                 songData[row][6] = results.getString(7);
+                if(!playlistName.equals("Library")) songData[row][7] = results.getInt(8);
+                else songData[row][7] = -1;
                 
                 row++;
             }
@@ -204,7 +236,9 @@ public class DatabaseModel {
             
             while(results.next())
                 playlists.add(results.getString("playlistName"));
-        } catch(SQLException e) { e.printStackTrace(); }
+        } catch(SQLException e) {
+            e.printStackTrace();
+        }
         return playlists;
     }
 }

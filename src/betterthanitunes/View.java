@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Point;
@@ -19,7 +18,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JFileChooser;
@@ -32,12 +30,13 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
+import javax.swing.JSlider;
 import javax.swing.JTable;
 import javax.swing.JTextPane;
 import javax.swing.JTree;
-import javax.swing.RowSorter;
-import javax.swing.SortOrder;
 import javax.swing.SwingUtilities;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.table.DefaultTableModel;
@@ -45,48 +44,87 @@ import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 import javax.swing.filechooser.FileNameExtensionFilter;
-import javax.swing.table.TableModel;
-import javax.swing.table.TableRowSorter;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
+/**
+ * Class represents an application window for BetterThaniTunes
+ * with GUI elements to interact with the application and
+ * play music, create playlists, and manage a music library.
+ * @author Steven McCracken
+ * @author Mark Saavedra
+ */
 public class View extends JFrame {
-    JMenuBar menuBar;
-    JPopupMenu songTablePopupMenu;
-    JTable songTable;
-    JScrollPane scrollPane, sidePanel;
-    JTextPane currentSong;
-    JCheckBox repeatPlaylist, repeatSong;
-    JButton play, stop, pause_resume, next, previous;
     JPanel framePanel, controlPanel, songInfoPanel, bottomPanel;
-    JFileChooser fileChooser;
+    JScrollPane songTableScrollPane, playlistTreeScrollPane;
+    JTable songTable;
     JTree playlistTree;
-    
-    Controller controller;
-    String currentPlaylist;
     DefaultTableModel tableModel;
     DefaultTreeModel treeModel;
-    DefaultMutableTreeNode sidePanelTreeRoot, nextNode;
+    JButton play, stop, pause_resume, next, previous;
+    JCheckBox repeatPlaylist, repeatSong;
+    JSlider volumeSlider;
+    JMenuBar menuBar;
+    JPopupMenu songTablePopupMenu, sidePanelPopupMenu;
+    JTextPane currentSong;
+    JFileChooser fileChooser;
+    DefaultMutableTreeNode playlistTreeRoot, nextNode;
+    Controller controller;
+    String currentPlaylist;
+    String[] tableHeaders = {"Title", "Artist", "Album", "Year", "Genre", "Comment", "Path", "ID"};
     Object[][] songData;
-    String[] tableHeaders = {"Title", "Artist", "Album", "Year", "Genre", "Comment", "Path"};
     
+    /**
+     * Default constructor creates a BetterThaniTunes
+     * window with the playlist navigator side panel.
+     */
     public View() {
         super("BetterThaniTunes");
         this.controller = new Controller();
         
         setupFileChooser();
-        setupSongTable();
+        setupSongTable("Library");
         setupMenuBar();
-        setupSongTablePopupMenu();
+        setupPopupMenus();
         setupSidePanel();
         setupButtons();
         setupControlPanel();
         setupSongArea();
-        setupFramePanel();
-        setupGuiWindow();
+        setupFramePanel(false);
+        setupGuiWindow(false);
+    }
+    
+    /**
+     * Constructor creates a BetterThaniTunes window only
+     * displaying the playlist inputted as the parameter,
+     * without the playlist navigator side panel.
+     * @param playlist the playlist for the window to display
+     * @param controller the controller that plays the songs
+     */
+    public View(String playlist, Controller controller) {
+        super("BetterThaniTunes - " + playlist);
+        this.controller = controller;
+        
+        setupFileChooser();
+        setupSongTable(playlist);
+        setupMenuBar();
+        setupPopupMenus();
+        setupButtons();
+        setupControlPanel();
+        setupSongArea();
+        setupFramePanel(true);
+        setupGuiWindow(true);
+    }
+    
+    /**
+     * Method returns the playlist that the window is displaying
+     * @return currentPlaylist String value of playlist displayed
+     */
+    public String getCurrentPlaylist() {
+        return currentPlaylist;
     }
     
     /**
@@ -98,12 +136,31 @@ public class View extends JFrame {
     }
     
     /**
-     * Method displays text on the GUI window showing what song is currently playing
-     * @param song 
+     * Method displays text on the window showing what song is currently playing
+     * @param song the song currently playing
+     * @param secondsPlayed the progression of the current song playing
      */
-    public void updatePlayer(Song song) {
-    	currentSong.setText(song.getTitle() + "\n" + song.getAlbum() + " by " + song.getArtist());
+    public void updatePlayer(Song song, long secondsPlayed) {
+        long minutesPlayed = secondsPlayed/60;
+        secondsPlayed -= minutesPlayed*60; // Keep seconds between 0 and 60
+        
+        // If secondsPlayed is below 10, add a 0 before it for formatting purposes
+        String time = minutesPlayed + ":";
+        if(secondsPlayed < 10) time += "0" + secondsPlayed;
+        else time += secondsPlayed;
+        
+    	currentSong.setText(song.getTitle() + "\n" + song.getAlbum() + " by " + song.getArtist() + "\n" + time);
         songInfoPanel.updateUI();
+    }
+    
+    /**
+     * Method updates the volume slider cursor
+     * @param volume the value to move the cursor to on the slider
+     */
+    public void updateVolumeSlider(double volume) {
+        /* Multiply volume parameter by 100 because it
+        is passed in as a double between 0.0 & 1.0 */
+        volumeSlider.setValue((int)(volume*100));
     }
     
     /**
@@ -115,54 +172,54 @@ public class View extends JFrame {
     }
     
     /**
-     * Method adds a song to the controller and updates the Library table
-     * @param song to be added
+     * Method updates the selection of the repeatSong button
+     * @param repeat the value determining if the button is selected or unselected
      */
-    public void addSong(Song song, String playlistName) {
-        if(controller.addSong(song, playlistName)) {
-            Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),
-                                controller.genres.get(song.getGenre()),song.getComment(),song.getPath()};
-            tableModel.addRow(rowData); // Adds song to Library table
-        }
+    public void updateRepeatSongButton(boolean repeat) {
+        repeatSong.setSelected(repeat);
     }
     
     /**
-     * Method updates the main GUI window to display the songs in a playlist
-     * @param playlistName the playlist that is currently selected in the sidebar
+     * Method updates the selection of the repeatPlaylist button
+     * @param repeat the value determining if the button is selected or unselected
+     */
+    public void updateRepeatPlaylistButton(boolean repeat) {
+        repeatPlaylist.setSelected(repeat);
+    }
+    
+    /**
+     * Method updates a window to display the songs in that window's current playlist
+     * @param playlistName the playlist that the window is currently displaying
      */
     public void updateSongTableView(String playlistName) {
-        // Clear the table
+        // Clear the table of all existing rows
         for(int row = tableModel.getRowCount() - 1; row >= 0; row--)
             tableModel.removeRow(row);
         
+        // Get all rows from the database and add them back to the table
         Object[][] data = controller.returnAllSongs(playlistName);
         for(int i = 0; i < data.length; i++)
-            tableModel.addRow(new Object[] {data[i][0], data[i][1], data[i][2], data[i][3], data[i][4], data[i][5], data[i][6]} );
+            tableModel.addRow(new Object[] {data[i][0], data[i][1], data[i][2], data[i][3], data[i][4], data[i][5], data[i][6], data[i][7]});
         
-        tableModel.fireTableDataChanged(); // Update tableModel to update table with new rows added
+        // Update tableModel to alert table that new rows have been added
+        tableModel.fireTableDataChanged();
     }
     
     /**
-     * Class defines behavior for when the user
-     * right clicks somewhere in the song table.
+     * Method adds a song to a playlist and updates all
+     * windows currently displaying that playlist.
+     * @param song to be added
+     * @param playlistName the playlist to add the song to
      */
-    class songTablePopupMenuListener extends MouseAdapter {
-        @Override
-        public void mouseReleased(MouseEvent e) {
-            if(SwingUtilities.isRightMouseButton(e)) {
-                if(((JMenuItem)songTablePopupMenu.getComponent(1)).getText().equals("Add selected songs to a playlist"))
-                    songTablePopupMenu.remove(1);
-                
-                JMenu subMenu = new JMenu("Add selected songs to a playlist");
-                ArrayList<String> playlistNames = controller.returnAllPlaylists();
-                for(String playlistName : playlistNames) {
-                    JMenuItem playlistMenuItem = new JMenuItem(playlistName);
-                    playlistMenuItem.addActionListener(new addSongsToPlaylistListener());
-                    subMenu.add(playlistMenuItem);
-                }
-                songTablePopupMenu.add(subMenu, 1);
-                songTablePopupMenu.show(e.getComponent(), e.getX(), e.getY());
-            }
+    public void addSong(Song song, String playlistName) {
+        // If adding the song to the controller returns true...
+        if(controller.addSong(song, playlistName)) {
+            // Create a new row with the song's attributes
+            Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),
+                                controller.genres.get(song.getGenre()),song.getComment(),song.getPath(), -1};
+            tableModel.addRow(rowData); // Add the row to the playlist table
+            // Update all playlists displaying the playlist that the song was just added to
+            BetterThaniTunes.updateWindows(currentPlaylist);
         }
     }
     
@@ -180,11 +237,20 @@ public class View extends JFrame {
                 for(File file : files) {
                     // Create a Song object from the file
                     Song song = new Song(file.getPath());
-                    if(controller.addSong(song, "Library")) {
-                        Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),controller.genres.get(song.getGenre()),song.getComment()};
-                        tableModel.addRow(rowData);
+                    // If the song already exists in the library, don't do anything
+                    if(!controller.doesSongAlreadyExist(song.getPath())) {
+                        // Else, add it to the library and the current playlist
+                        if(controller.addSong(song, currentPlaylist)) {
+                            Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),controller.genres.get(song.getGenre()),song.getComment()};
+                            tableModel.addRow(rowData);
+                        }
                     }
                 }
+                // Update all playlists displaying the playlist that the song was just added to
+                BetterThaniTunes.updateWindows(currentPlaylist);
+                // If the main application window was displaying the library playlist, refresh that table
+                if(BetterThaniTunes.getView(0).getCurrentPlaylist().equals("Library"))
+                    BetterThaniTunes.updateLibrary();
             }
         }
     }
@@ -199,24 +265,27 @@ public class View extends JFrame {
         public void actionPerformed(ActionEvent e) {
             int rows[] = songTable.getSelectedRows();
             if(rows.length > 0) {
-                for(int row = rows.length-1; row >= 0; row--) {
-                    Song song = new Song(songTable.getValueAt(rows[row], 6).toString());
-                    if(controller.deleteSong(song, currentPlaylist))
-                        tableModel.removeRow(rows[row]);
-                }
-            }
-        }
-    }
-    
-    class addSongsToPlaylistListener implements ActionListener {
-        @Override
-        public void actionPerformed(ActionEvent e) {
-            String playlist = ((JMenuItem)e.getSource()).getText();
-            int[] rows = songTable.getSelectedRows();
-            if(rows.length > 0) {
-                for(int row = 0; row < rows.length; row++) {
-                    Song song = new Song(tableModel.getValueAt(rows[row], 6).toString());
-                    controller.addSong(song, playlist);
+                // Display confirmation message before removing songs
+                String message = "Are you sure you want to ";
+                if(currentPlaylist.equals("Library")) message += "delete the following songs from your library?";
+                else message += "remove the following songs from " + currentPlaylist + "?";
+                for(int row = 0; row < rows.length; row++)
+                    message += "\n\t\t\t\t\t\t" + songTable.getValueAt(rows[row], 0).toString();
+                
+                // Get user confirmation or denial
+                int optionSelection = JOptionPane.showConfirmDialog(framePanel, message);
+                if(optionSelection == JOptionPane.YES_OPTION) {
+                    for(int row = rows.length-1; row >= 0; row--) {
+                        Song song = new Song(songTable.getValueAt(rows[row], 6).toString());
+                        // Remove each song from the database and the current window's playlist table
+                        if(controller.deleteSong(song, currentPlaylist, (int)songTable.getValueAt(rows[row],7)))
+                            tableModel.removeRow(rows[row]);
+                    }
+                    // Update all the other windows
+                    if(currentPlaylist.equals("Library"))
+                        BetterThaniTunes.updateAllWindows();
+                    else
+                        BetterThaniTunes.updateWindows(currentPlaylist);
                 }
             }
         }
@@ -230,16 +299,18 @@ public class View extends JFrame {
         @Override
         public void actionPerformed(ActionEvent e) {
             // Display a box to get user input
-            String playlistName = JOptionPane.showInputDialog("Playlist name: ");
+            String playlistName = JOptionPane.showInputDialog("Playlist name");
             
             // If the user clicks "OK" option, attempt to create the playlist
             if(playlistName != null) {
                 // If user enters a valid playlist name, add it to the playlist tree
                 if(controller.addPlaylist(playlistName)) {
+                    // Create new playlist node
                     DefaultMutableTreeNode playlist = new DefaultMutableTreeNode(playlistName);
-                    ((DefaultMutableTreeNode)sidePanelTreeRoot.getChildAt(1)).add(playlist);
-                    nextNode = playlist;
-                    treeModel.reload(sidePanelTreeRoot.getChildAt(1));
+                    // Add playlist node to the playlist tree
+                    ((DefaultMutableTreeNode)playlistTreeRoot.getChildAt(1)).add(playlist);
+                    nextNode = playlist; // Set nextNode to playlist just created
+                    treeModel.reload(playlistTreeRoot.getChildAt(1));
                     
                     // Navigate to newly created playlist in tree
                     playlistTree.setSelectionPath(new TreePath(playlist.getPath()));
@@ -261,23 +332,90 @@ public class View extends JFrame {
             DefaultMutableTreeNode nodeToBeDeleted = ((DefaultMutableTreeNode)path.getLastPathComponent());
             
             // Makes sure user doesn't delete the Library or Playlist nodes
-            if(nodeToBeDeleted.isLeaf() && !nodeToBeDeleted.toString().equals("Library")) {
-                DefaultMutableTreeNode playlistNode = ((DefaultMutableTreeNode)sidePanelTreeRoot.getChildAt(1));
-                
-                // If the user deletes the last existing playlist, set the view to the Library
-                if(playlistNode.getChildCount() == 1)
-                    nextNode = (DefaultMutableTreeNode)sidePanelTreeRoot.getChildAt(0);
-                // Else if the user deletes the first playlist existing, set the view to the next playlist
-                else if(playlistNode.getIndex(nodeToBeDeleted) == 0)
-                    nextNode = (DefaultMutableTreeNode)playlistNode.getChildAfter(nodeToBeDeleted);
-                // Else set the view to the playlist before the one deleted
-                else
-                    nextNode = (DefaultMutableTreeNode)playlistNode.getChildBefore(nodeToBeDeleted);
-                
-                if(controller.deletePlaylist(nodeToBeDeleted.toString())) {
-                    playlistTree.setSelectionPath(new TreePath(nextNode.getPath()));
-                    treeModel.removeNodeFromParent(nodeToBeDeleted);
-                }    
+            if(!nodeToBeDeleted.toString().equals("Library") && !nodeToBeDeleted.toString().equals("Playlists")) {
+                // Display confirmation message
+                int optionSelection = JOptionPane.showConfirmDialog(framePanel, "Are you sure you want to delete " + nodeToBeDeleted.toString() + "?");
+                if(optionSelection == JOptionPane.YES_OPTION) {
+                    DefaultMutableTreeNode playlistNode = ((DefaultMutableTreeNode)playlistTreeRoot.getChildAt(1));
+
+                    // If the user deletes the last existing playlist, set the view to the Library
+                    if(playlistNode.getChildCount() == 1)
+                        nextNode = (DefaultMutableTreeNode)playlistTreeRoot.getChildAt(0);
+                    // Else if the user deletes the first playlist existing, set the view to the next playlist
+                    else if(playlistNode.getIndex(nodeToBeDeleted) == 0)
+                        nextNode = (DefaultMutableTreeNode)playlistNode.getChildAfter(nodeToBeDeleted);
+                    // Else set the view to the playlist before the one deleted
+                    else
+                        nextNode = (DefaultMutableTreeNode)playlistNode.getChildBefore(nodeToBeDeleted);
+
+                    // Delete playlist from database
+                    if(controller.deletePlaylist(nodeToBeDeleted.toString())) {
+                        playlistTree.setSelectionPath(new TreePath(nextNode.getPath()));
+                        ArrayList<View> viewsWithTitle = BetterThaniTunes.getViews("BetterThaniTunes - " + nodeToBeDeleted.toString());
+                        for(View view : viewsWithTitle)
+                            view.dispose();
+                        treeModel.removeNodeFromParent(nodeToBeDeleted);
+                    }  
+                }
+            }
+        }
+    }
+    
+    /**
+     * Class defines behavior for when user creates a new playlist
+     * from an existing selection of songs in another playlist.
+     */
+    class createPlaylist_AddSongsListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            // Display a box to get user input
+            String playlistName = JOptionPane.showInputDialog("Playlist name");
+            
+            // If the user clicks "OK" option, attempt to create the playlist
+            if(playlistName != null) {
+                // If user entered a valid playlist name
+                if(controller.addPlaylist(playlistName)) {
+                    // Add all selected songs to that playlist
+                    int[] rows = songTable.getSelectedRows();
+                    if(rows.length > 0) {
+                        for(int row = 0; row < rows.length; row++) {
+                            Song song = new Song(tableModel.getValueAt(rows[row], 6).toString());
+                            controller.addSong(song, playlistName);
+                        }
+                    }
+                    
+                    // Create new playlist node and add it to the playlist tree
+                    DefaultMutableTreeNode playlist = new DefaultMutableTreeNode(playlistName);
+                    ((DefaultMutableTreeNode)playlistTreeRoot.getChildAt(1)).add(playlist);
+                    nextNode = playlist;
+                    treeModel.reload(playlistTreeRoot.getChildAt(1));
+                    
+                    // Navigate to newly created playlist in tree
+                    playlistTree.setSelectionPath(new TreePath(playlist.getPath()));
+                    playlistTree.scrollPathToVisible(new TreePath(playlist.getPath()));
+                }
+            }
+        }
+    }
+    
+    /**
+     * Class defines behavior for when user adds a
+     * selection of songs to an existing playlist.
+     */
+    class addSongsToPlaylistListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            // Get the name of the playlist that the user selected from the context menu
+            String playlist = ((JMenuItem)e.getSource()).getText();
+            int[] rows = songTable.getSelectedRows();
+            if(rows.length > 0) {
+                // Add those songs to the playlist
+                for(int row = 0; row < rows.length; row++) {
+                    Song song = new Song(tableModel.getValueAt(rows[row], 6).toString());
+                    controller.addSong(song, playlist);
+                }
+                // Update all windows displaying that playlist
+                BetterThaniTunes.updateWindows(playlist);
             }
         }
     }
@@ -288,18 +426,20 @@ public class View extends JFrame {
     class sidePanelSelectionListener implements TreeSelectionListener {
         @Override
         public void valueChanged(TreeSelectionEvent e) {
+            /**
+             * This method is called when a node in the playlist tree is selected,
+             * or when the tree is updated. When the tree is updated, there is no
+             * selection path so selectedNode is null. This is why it's assigned
+             * to nextNode, because nextNode was assigned a value in methods
+             * that handle when the playlist tree is updated.
+             */
             DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode)playlistTree.getLastSelectedPathComponent();
-            
-            /* valueChanged method is called when a node is selected, created, or deleted.
-             * When a node is created or deleted, selectedNode is null. In this case, selectedNode
-             * is set to nextNode to prevent a null pointer exception. nextNode is determined
-             * in actionPerformed methods of create or delete PlaylistListener classes */
             if(selectedNode == null) selectedNode = nextNode;
             
             // If Playlists node is selected, the view will not update because it isn't a playlist
-            if(selectedNode.isLeaf()) {
-                updateSongTableView(selectedNode.toString());
+            if(!selectedNode.toString().equals("Playlists")) {
                 currentPlaylist = selectedNode.toString();
+                updateSongTableView(currentPlaylist);
             }
         }
     }
@@ -312,18 +452,24 @@ public class View extends JFrame {
         public void mousePressed(MouseEvent e) {
             // If user selects a playlist node and then right clicks, display the popup menu
             if(SwingUtilities.isRightMouseButton(e) && (playlistTree.getSelectionCount() > 0)) {
-                
-                // Setup popup menu with delete playlist listener
-                JPopupMenu popup = new JPopupMenu();
-                JMenuItem deletePlaylistMenuItem = new JMenuItem("Delete playlist");
-                deletePlaylistMenuItem.addActionListener(new deletePlaylistListener());
-                popup.add(deletePlaylistMenuItem);
-                
                 // If user selects anything other than the Library or Playlists nodes, show the delete popup menu
                 DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode)playlistTree.getSelectionPath().getLastPathComponent();
                 if(!selectedNode.toString().equals("Library") && !selectedNode.toString().equals("Playlists"))
-                    popup.show(playlistTree, e.getX(), e.getY());
+                    sidePanelPopupMenu.show(playlistTree, e.getX(), e.getY());
             }
+        }
+    }
+    
+    /**
+     * Class defines behavior for when user opens a playlist in a new window.
+     */
+    class openInNewWindowListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            // Get the playlist the user selected
+            String playlist = ((DefaultMutableTreeNode)playlistTree.getSelectionPath().getLastPathComponent()).toString();
+            // Create a new window with that playlist
+            BetterThaniTunes.createNewView(playlist, controller);
         }
     }
     
@@ -333,17 +479,19 @@ public class View extends JFrame {
     class playExternalSongListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
+            // Display a file chooser
             int returnVal = fileChooser.showOpenDialog(new JPanel());
             if(returnVal == JFileChooser.APPROVE_OPTION) {
+                // Get the path of the file that the user selected
                 String songPath = fileChooser.getSelectedFile().getAbsolutePath();
+                // Play the song but don't add it to the library
                 controller.play(songPath, -1);
             }
         }
     }
     
     /**
-     * Class defines behavior for when user selects
-     * quit application option from the menu bar.
+     * Class defines behavior for when user selects quit application option from the menu bar.
      */
     class quitButtonListener implements ActionListener {
         @Override
@@ -353,8 +501,7 @@ public class View extends JFrame {
     }
     
     /**
-     * Class defines behavior for when user checks
-     * or un-checks repeatPlaylist box.
+     * Class defines behavior for when user checks or un-checks repeatPlaylist box.
      */
     class repeatPlaylistButtonListener implements ActionListener {
     	@Override
@@ -364,8 +511,7 @@ public class View extends JFrame {
     }
     
     /**
-     * Class defines behavior for when user
-     * checks or un-checks repeatSong box.
+     * Class defines behavior for when user checks or un-checks repeatSong box.
      */
     class repeatSongButtonListener implements ActionListener {
     	@Override
@@ -380,9 +526,9 @@ public class View extends JFrame {
     class playButtonListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
-            //If user has selected a row, play that song
+            //If user has selected a row...
             if(songTable.getSelectedRow() != -1) {
-                // Add all songs in the current playlist to he controller's play order
+                // Add all songs in the current playlist to the play order
                 ArrayList<String> songPaths = new ArrayList<>();
                 for(int i = 0; i < songTable.getRowCount(); i++)
                     songPaths.add(songTable.getValueAt(i, 6).toString());
@@ -436,19 +582,68 @@ public class View extends JFrame {
     	}
     }
     
+    /**
+     * Class defines behavior for when user adjusts the cursor on the volume slider.
+     */
+    class volumeSliderListener implements ChangeListener {
+        @Override
+        public void stateChanged(ChangeEvent e) {
+            controller.changeVolume(((JSlider)e.getSource()).getValue()/100.0);
+        }
+    }
+    
+    /**
+     * Class defines behavior for when the user right clicks somewhere in the song table.
+     */
+    class songTablePopupMenuListener extends MouseAdapter {
+        @Override
+        public void mouseReleased(MouseEvent e) {
+            // If the user right clicked...
+            if(SwingUtilities.isRightMouseButton(e)) {
+                // If user right-clicked before, remove previous menu item that contained playlists
+                if(((JMenuItem)songTablePopupMenu.getComponent(1)).getText().equals("Add to Playlist"))
+                    songTablePopupMenu.remove(1);
+                
+                // Create a submenu within the popup menu
+                JMenu subMenu = new JMenu("Add to Playlist");
+                // Get all existing playlist names and add them to the submenu
+                ArrayList<String> playlistNames = controller.returnAllPlaylists();
+                for(String playlistName : playlistNames) {
+                    JMenuItem playlistMenuItem = new JMenuItem(playlistName);
+                    playlistMenuItem.addActionListener(new addSongsToPlaylistListener());
+                    subMenu.add(playlistMenuItem);
+                }
+                
+                // Add the submenu containing all playlists and display the popup menu
+                songTablePopupMenu.add(subMenu, 1);
+                songTablePopupMenu.show(e.getComponent(), e.getX(), e.getY());
+            }
+        }
+    }
+    
     public final void setupFileChooser() {
-        this.fileChooser = new JFileChooser();
+        fileChooser = new JFileChooser();
         fileChooser.setFileFilter(new FileNameExtensionFilter("MP3 Files", "mp3"));
         fileChooser.setMultiSelectionEnabled(true);
     }
     
-    public final void setupSongTable() {
-        currentPlaylist = "Library";
+    public final void setupSongTable(String playlist) {
+        currentPlaylist = playlist;
         songData = controller.returnAllSongs(currentPlaylist);
         
         tableModel = new DefaultTableModel(songData, tableHeaders);
         songTable = new JTable(tableModel);
         songTable.addMouseListener(new songTablePopupMenuListener());
+        
+        // Hide columns that show song path & song ID in playlists
+        for(int i = 6; i <= 7; i++) {
+            songTable.getColumnModel().getColumn(i).setMinWidth(0);
+            songTable.getColumnModel().getColumn(i).setMaxWidth(0);
+            songTable.getColumnModel().getColumn(i).setResizable(false);
+        }
+        
+        // Place song table in a scroll pane
+        songTableScrollPane = new JScrollPane(songTable);
         
         // Add drag and drop functionality to song table
         songTable.setDropTarget(
@@ -470,6 +665,8 @@ public class View extends JFrame {
                                         File f = (File) value;
                                         Song song = new Song(f.getAbsolutePath());
                                         addSong(song, currentPlaylist);
+                                        if(BetterThaniTunes.getView(0).getCurrentPlaylist().equals("Library"))
+                                            BetterThaniTunes.updateLibrary();
                                     }
                                 }
                             }
@@ -477,8 +674,7 @@ public class View extends JFrame {
                             e.printStackTrace();
                         }
                     }
-                    else
-                        dtde.rejectDrop();
+                    else dtde.rejectDrop();
                 }
                 
                 @Override
@@ -492,21 +688,6 @@ public class View extends JFrame {
                     dtde.acceptDrag(DnDConstants.ACTION_COPY_OR_MOVE);
                 }
             });
-        
-        // Hide column that shows song path in song table
-        songTable.getColumnModel().getColumn(6).setMinWidth(0);
-        songTable.getColumnModel().getColumn(6).setMaxWidth(0);
-        songTable.getColumnModel().getColumn(6).setResizable(false);
-        
-        scrollPane = new JScrollPane(songTable);
-        
-        /*TableRowSorter<TableModel> sorter = new TableRowSorter<>(songTable.getModel());
-        songTable.setRowSorter(sorter);
-
-        List<RowSorter.SortKey> sortKeys = new ArrayList<>(25);
-        sortKeys.add(new RowSorter.SortKey(4, SortOrder.ASCENDING));
-        sortKeys.add(new RowSorter.SortKey(0, SortOrder.ASCENDING));
-        sorter.setSortKeys(sortKeys);*/
     }
     
     public final void setupMenuBar() {
@@ -516,7 +697,7 @@ public class View extends JFrame {
         JMenuItem addSongMenuItem = new JMenuItem("Add songs");
         JMenuItem deleteSongMenuItem = new JMenuItem("Delete selected songs");
         JMenuItem playExternalSongMenuItem = new JMenuItem("Play a song not in the library");
-        JMenuItem createPlaylist = new JMenuItem("Create a playlist");
+        JMenuItem createPlaylist = new JMenuItem("Create Playlist");
         JMenuItem deletePlaylist = new JMenuItem("Delete selected playlist");
         JMenuItem quitApplicationMenuItem = new JMenuItem("Quit application");
         
@@ -538,19 +719,32 @@ public class View extends JFrame {
         menuBar.add(fileMenu);
     }
     
-    public final void setupSongTablePopupMenu() {
+    public final void setupPopupMenus() {
         songTablePopupMenu = new JPopupMenu();
+        sidePanelPopupMenu = new JPopupMenu();
+        
         JMenuItem addSong = new JMenuItem("Add songs");
-        JMenuItem deleteSong = new JMenuItem("Delete selected songs");
+        JMenuItem createPlaylistFromSelection = new JMenuItem("New Playlist from Selection");
+        JMenuItem deleteSong = new JMenuItem("Delete");
+        JMenuItem deletePlaylistMenuItem = new JMenuItem("Delete Playlist");
+        JMenuItem openInNewWindow = new JMenuItem("Open in New Window");
+        
         addSong.addActionListener(new addSongListener());
+        createPlaylistFromSelection.addActionListener(new createPlaylist_AddSongsListener());
         deleteSong.addActionListener(new deleteSongListener());
+        deletePlaylistMenuItem.addActionListener(new deletePlaylistListener());
+        openInNewWindow.addActionListener(new openInNewWindowListener());
+        
         songTablePopupMenu.add(addSong);
+        songTablePopupMenu.add(createPlaylistFromSelection);
         songTablePopupMenu.add(deleteSong);
+        sidePanelPopupMenu.add(deletePlaylistMenuItem);
+        sidePanelPopupMenu.add(openInNewWindow);
     }
     
     public final void setupSidePanel() {
-        sidePanelTreeRoot = new DefaultMutableTreeNode("Root");
-        treeModel = new DefaultTreeModel(sidePanelTreeRoot);
+        playlistTreeRoot = new DefaultMutableTreeNode("Root");
+        treeModel = new DefaultTreeModel(playlistTreeRoot);
         
         playlistTree = new JTree();
         playlistTree.setRootVisible(false);
@@ -569,12 +763,13 @@ public class View extends JFrame {
         for(String playlistName : playlistNames)
             playlists.add(new DefaultMutableTreeNode(playlistName));
         
-        treeModel.insertNodeInto(library, sidePanelTreeRoot, 0);
-        treeModel.insertNodeInto(playlists, sidePanelTreeRoot, 1);
+        treeModel.insertNodeInto(library, playlistTreeRoot, 0);
+        treeModel.insertNodeInto(playlists, playlistTreeRoot, 1);
         treeModel.nodeStructureChanged((TreeNode)treeModel.getRoot());
         
-        sidePanel = new JScrollPane(playlistTree);
-        sidePanel.setPreferredSize(new Dimension((int)(songTable.getPreferredSize().getWidth()/4), (int)songTable.getPreferredSize().getHeight()));
+        playlistTreeScrollPane = new JScrollPane(playlistTree);
+        playlistTreeScrollPane.setPreferredSize(new Dimension((int)(songTable.getPreferredSize().getWidth()/4),
+                                                (int)songTable.getPreferredSize().getHeight()));
     }
     
     public final void setupButtons() {
@@ -586,6 +781,7 @@ public class View extends JFrame {
         next = new JButton("Next song");
         repeatPlaylist = new JCheckBox("Repeat Playlist");
         repeatSong = new JCheckBox("Repeat Song");
+        volumeSlider = new JSlider(JSlider.HORIZONTAL, 0, 100, (int)(controller.getGain()*100));
         
         // Add actions to control buttons
         play.addActionListener(new playButtonListener());
@@ -595,6 +791,7 @@ public class View extends JFrame {
         previous.addActionListener(new previousSongButtonListener());
         repeatPlaylist.addActionListener(new repeatPlaylistButtonListener());
         repeatSong.addActionListener(new repeatSongButtonListener());
+        volumeSlider.addChangeListener(new volumeSliderListener());
     }
     
     public final void setupControlPanel() {
@@ -606,7 +803,9 @@ public class View extends JFrame {
         controlPanel.add(next);
         controlPanel.add(repeatSong);
         controlPanel.add(repeatPlaylist);
+        controlPanel.add(volumeSlider);
     }
+    
     
     public final void setupSongArea() {
         // Set up current song playing area
@@ -627,21 +826,35 @@ public class View extends JFrame {
         bottomPanel.add(controlPanel, BorderLayout.SOUTH);
     }
     
-    public final void setupFramePanel() {
+    public final void setupFramePanel(boolean newWindow) {
         framePanel = new JPanel();
         framePanel.setLayout(new BorderLayout());
         framePanel.add(menuBar, BorderLayout.NORTH);
-        framePanel.add(scrollPane,BorderLayout.CENTER);
-        framePanel.add(sidePanel, BorderLayout.WEST);
+        framePanel.add(songTableScrollPane,BorderLayout.CENTER);
+        if(!newWindow) framePanel.add(playlistTreeScrollPane, BorderLayout.WEST);
         framePanel.add(bottomPanel, BorderLayout.SOUTH);
         framePanel.addMouseListener(new songTablePopupMenuListener());
     }
     
-    public final void setupGuiWindow() {
+    
+    public final void setupGuiWindow(boolean newWindow) {
         this.setPreferredSize(new Dimension(1000, 700));
-        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        
+        if(newWindow) this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        else this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        
         this.getContentPane().add(framePanel);
         this.pack();
         this.setVisible(true);
+    }
+    
+    /**
+     * Method is called when the user closes a playlist window
+     * The window is removed from the list of windows and then closed.
+     */
+    @Override
+    public void dispose() {
+        BetterThaniTunes.removeView(this);
+        super.dispose();
     }
 }

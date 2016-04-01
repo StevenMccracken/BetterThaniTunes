@@ -2,7 +2,6 @@ package betterthanitunes;
 
 import java.io.File;
 import java.io.IOException;
-
 import com.mpatric.mp3agic.ID3v1;
 import com.mpatric.mp3agic.ID3v24Tag;
 import com.mpatric.mp3agic.Mp3File;
@@ -10,6 +9,12 @@ import com.mpatric.mp3agic.InvalidDataException;
 import com.mpatric.mp3agic.NotSupportedException;
 import com.mpatric.mp3agic.UnsupportedTagException;
 
+/**
+ * Class represents an MP3 song, holding the path of the file
+ * and the tag information all in one object. 
+ * @author Steven McCracken
+ * @author Mark Saavedra
+ */
 public class Song {
     private Mp3File file;
     private String filename;
@@ -73,10 +78,6 @@ public class Song {
         if(changesMade) file.setId3v1Tag(tag);
     }
     
-    public String getFilename() {
-        return filename;
-    }
-    
     public void saveSong(String path) {
         try {
             file.save(path);
@@ -84,10 +85,10 @@ public class Song {
             e.printStackTrace();
         }
     }
-	
-    // Method returns total frames of mp3 file
-    public long getFrames() {
-        return file.getFrameCount();
+    
+    // Method returns the name of the file
+    public String getFilename() {
+        return filename;
     }
 
     // Method returns total duration of mp3 file in microseconds
@@ -95,27 +96,18 @@ public class Song {
         return file.getLengthInMilliseconds()*1000;
     }
 
-    // Method returns total bytes of mp3 file
-    public long getBytes() {
-        return file.getLength();
-    }
-
-    // Method returns string pathname of mp3 file
     public String getPath() {
         return fullPath;
     }
 
-    // Method returns song title
     public String getTitle() {
         return tag.getTitle();
     }
 
-    // Method returns song artist
     public String getArtist() {
         return tag.getArtist();
     }
 
-    // Method returns song album
     public String getAlbum() {
         return tag.getAlbum();
     }
