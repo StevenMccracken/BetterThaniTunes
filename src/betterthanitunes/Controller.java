@@ -1,253 +1,472 @@
 package betterthanitunes;
 
 import java.io.File;
-import java.io.PrintStream;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.ArrayList;
-import java.util.Arrays;
-
 import javazoom.jlgui.basicplayer.BasicController;
 import javazoom.jlgui.basicplayer.BasicPlayer;
 import javazoom.jlgui.basicplayer.BasicPlayerEvent;
 import javazoom.jlgui.basicplayer.BasicPlayerException;
 import javazoom.jlgui.basicplayer.BasicPlayerListener;
 
+/**
+ * Class represents an MP3 player that organizes songs
+ * in a playlist and controls all functions related to
+ * the playback of songs.
+ * @author Steven McCracken
+ * @author Mark Saavedra
+ */
 public class Controller implements BasicPlayerListener {
-    private PrintStream out = null;
     private BasicController controller;
-    private BasicPlayer player = null;
+    private BasicPlayer player = new BasicPlayer();
+    private DatabaseModel database;
     
-    private Song songPlaying = null;
+    private double gain = 0.5; // Volume (0.0 - 1.0)
+    private long secondsPlayed = 0; // Song progression
+    private int currentIndex = -1;
+    private String songPlaying = "";
     private boolean repeatSong = false, repeatPlaylist = false;
-    private boolean isExternalSongPlaying = false;
     
-    private ArrayList<Song> songs;
-    
-    public static ArrayList<String> genres = new ArrayList<>(Arrays.asList("Hip-Hop/Rap", "Classical", "Unknown"));
+    private HashMap<String, Song> songs = new HashMap<>();
+    private ArrayList<String> playOrder = new ArrayList<>();
+    public static ArrayList<String> genres = new ArrayList<>();
 	
     public Controller() {
-    	out = System.out;
-    	
-        player = new BasicPlayer();
     	player.addBasicPlayerListener(this);
-    	
     	controller = (BasicController)player;
-    	this.setController(controller);
+    	//this.setController(controller);
         
-        songs = new ArrayList<Song>();
+        genres.add("Hip-Hop");
+        genres.add("Classical");
+        genres.add("Unknown");
+        genres.add("Rock");
+        genres.add("Pop");
+        genres.add("Electronic");
+        genres.add("Dance");
+        genres.add("Mix");
+        
+        database = new DatabaseModel();
+        if(!database.createConnection()) System.exit(0);
+        
+        initializeSongs();
     }
     
-    public void addSong(Song song) {
-    	songs.add(song);
+    /**
+     * Method retrieves all songs in database and adds them to the controller
+     */
+    private void initializeSongs() {
+        Object[][] songData = returnAllSongs("Library");
+        for(int i = 0; i < songData.length; i++)
+            songs.put(songData[i][6].toString(), new Song(songData[i][6].toString()));
     }
     
-    public ArrayList<Song> getAllSongs() {
-    	return songs;
+    /**
+     * Method updates the volume of song playback
+     * @param volume the value to set the gain
+     */
+    public void changeVolume(double volume) {
+        try {
+            if(isPlayerActive()) controller.setGain(volume);
+            gain = volume;
+            // Update the volume slider of all Views
+            for(View view : BetterThaniTunes.getAllViews())
+                view.updateVolumeSlider(gain);
+        }
+        catch(BasicPlayerException e) {
+            e.printStackTrace();
+        }
     }
     
-    public Song getSong(int index) {
-        return songs.get(index);
+    /**
+     * Method gets the volume of the controller
+     * @return the gain of the volume (0.0 - 1.0)
+     */
+    public double getGain() {
+        return gain;
     }
     
-    public void deleteSong(int index) {
-        if(songs.get(index) == songPlaying) stop();
-        songs.remove(index);
+    /**
+     * Method maps a song's path to it's Song object so it can be referred to by any playlist
+     * @param song the song to be added
+     * @param playlistName the playlist for the song to be added to
+     * @return true if the song is added. Otherwise, false
+     */
+    public boolean addSong(Song song, String playlistName) {
+        if(database.insertSong(song, playlistName)) {
+            if(playlistName.equals("Library"))
+                songs.put(song.getPath(), song);
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Method deletes a song from a playlist
+     * @param song the song to be deleted
+     * @param playlistName the playlist for the song to be deleted from
+     * @param id the unique id of a song in a playlist
+     * @return true if the song is deleted. Otherwise, false
+     */
+    public boolean deleteSong(Song song, String playlistName, int id) {
+        if(song.getPath().equals(songPlaying)) stop();
+        if(database.deleteSong(song, playlistName, id)) {
+            if(playlistName.equals("Library"))
+                songs.remove(song.getPath());
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Method gets a specific song from the Library
+     * @param path the key of the Song object in the map
+     * @return the Song object corresponding to it's key (path)
+     */
+    public Song getSong(String path) {
+        return songs.get(path);
+    }
+    
+    public boolean doesSongAlreadyExist(String path) {
+        return songs.containsKey(path);
+    }
+    
+    public Object[][] returnAllSongs(String playlistName) {
+        return database.returnAllSongs(playlistName);
+    }
+    
+    /**
+     * Method attempts to add a playlist to the database
+     * @param playlistName the name of the playlist to be inserted
+     * @return true if the playlist was inserted. Otherwise, false
+     */
+    public boolean addPlaylist(String playlistName) {
+        return database.insertPlaylist(playlistName);
+    }
+    
+    /**
+     * Method attempts to delete a playlist from the database
+     * @param playlistName the name of the playlist to be inserted
+     * @return true if the playlist was deleted. Otherwise, false
+     */
+    public boolean deletePlaylist(String playlistName) {
+        return database.deletePlaylist(playlistName);
+    }
+    
+    /**
+     * Method returns all playlists in the database
+     * @return list of playlist names
+     */
+    public ArrayList<String> returnAllPlaylists() {
+        return database.returnAllPlaylists();
+    }
+    
+    /**
+     * Updates the playOrder array list to contain the order of songs as they
+     * appear in a playlist, so they can be iterated over for consecutive playback
+     * @param songPaths the paths of the songs
+     */
+    public void updatePlayOrder(ArrayList<String> songPaths) {
+        playOrder.clear();
+        for(String songPath : songPaths)
+            playOrder.add(songPath);
     }
     
     /**
      * Method plays a song
-     * @param song the song to be played
+     * @param songPath the file path of the song to be opened
+     * @param currentIndex the index of the song in the song table,
+     * corresponding to it's position in the play order
      */
-    public void play(Song song, boolean isSongExternal) {
-    	// If song currently playing is the same as song passed in, do nothing
-        if(songPlaying != song) {
-            boolean update = false;
-            try {
-                // If the player is paused, set value to indicate that GUI pause_resume button should be updated
-                if(player.getStatus() == BasicPlayer.PAUSED) update = true;
-                
-                // Start playing the song
-                controller.open(new File(song.getPath()));
-                controller.play();
+    public void play(String songPath, int currentIndex) {
+        // Updates pause_resume button of all windows to switch text from 'resume' to 'pause'
+        if(isPlayerPaused()) {
+            for(View view : BetterThaniTunes.getAllViews())
+                view.updatePauseResumeButton("Pause");
+        }
+        
+        try {  
+            controller.open(new File(songPath));
+            controller.play();
+            changeVolume(gain);
+            
+            songPlaying = songPath;
+            this.currentIndex = currentIndex;
 
-                // Updates pause_resume button in GUI to switch display from 'resume' to 'pause'
-                if(update) BetterThaniTunes.view.updatePauseResumeButton("Pause");
-
-                songPlaying = song;
-                isExternalSongPlaying = isSongExternal;
-                
-                // Updates GUI area that displays the song that is currently playing
-                BetterThaniTunes.view.updatePlayer(songPlaying);
-            } catch(BasicPlayerException e) { e.printStackTrace(); }
-    	}
-    }
-    
-    /**
-     * Method stops the current song from playing
-     */
-    public void stop() {
-        // If player isn't playing a song, do nothing
-    	if(isPlayerActive()) {
-            try {
-                // Stop the song
-                controller.stop();
-                songPlaying = null;
-
-                // Update GUI are that displays the song that is currently playing
-                BetterThaniTunes.view.clearPlayer();
-                
-                // Updates pause_resume button in GUI to switch display from 'resume' to 'pause'
-                BetterThaniTunes.view.updatePauseResumeButton("Pause");
-            } catch(BasicPlayerException e) { e.printStackTrace(); }
-    	}
-    	else System.out.println("Nothing is playing");
+            // Updates area of all windows that display the currently playing song
+            for(View view : BetterThaniTunes.getAllViews())
+                view.updatePlayer(new Song(songPlaying), this.secondsPlayed);
+        } catch(BasicPlayerException e) {
+            e.printStackTrace();
+        }
     }
     
     /**
      * Method pauses the song that is currently playing
-     * or resumes the song that is currently paused
+     * or resumes the song that is currently paused.
      */
     public void pause_resume() {
-    	if(player.getStatus() == BasicPlayer.PLAYING) {
+    	if(isPlayerPlaying()) {
+            // Updates pause_resume button of all windows to switch text from 'pause' to 'resume'
+            for(View view : BetterThaniTunes.getAllViews())
+                view.updatePauseResumeButton("Resume");
             try {
-                // Pause the song
                 controller.pause();
-                
-                // Updates pause_resume button in GUI to switch display from 'pause' to 'resume'
-                BetterThaniTunes.view.updatePauseResumeButton("Resume");
-            } catch(BasicPlayerException e) { e.printStackTrace(); }
+            } catch(BasicPlayerException e) {
+                e.printStackTrace();
+            }
     	}
-    	else if(player.getStatus() == BasicPlayer.PAUSED) {
+    	else if(isPlayerPaused()) {
+            // Update pause_resume button of all windows to switch text from 'pause' to 'resume'
+            for(View view : BetterThaniTunes.getAllViews())
+                view.updatePauseResumeButton("Pause");
             try {
-                // Resume the song
                 controller.resume();
-                
-                // Update pause_resume button in GUI to switch display from 'pause' to 'resume'
-                BetterThaniTunes.view.updatePauseResumeButton("Pause");
-            } catch(BasicPlayerException e) { e.printStackTrace(); }
+            } catch(BasicPlayerException e) {
+                e.printStackTrace();
+            }
     	}
     	else System.out.println("Nothing is playing");
     }
     
     /**
-     * Method plays the next song in the library
+     * Method stops the current song from playing.
+     */
+    public void stop() {
+        // If player isn't playing a song, do nothing
+    	if(isPlayerActive()) {
+            // Update song area & pause/resume button of all windows
+            for(View view : BetterThaniTunes.getAllViews()) {
+                view.clearPlayer();
+                view.updatePauseResumeButton("Pause");
+            }
+            try {
+                // Stop the song
+                controller.stop();
+                songPlaying = "";
+                currentIndex = -1;
+            } catch(BasicPlayerException e) {
+                e.printStackTrace();
+            }
+    	}
+    	else System.out.println("Nothing is playing");
+    }
+    
+    /**
+     * Method plays the next song in the library.
      */
     public void nextSong() {
-        // If external song was playing, don't pay anything after it ends
-    	if(!isExternalSongPlaying && isPlayerActive()) {
+        // If external song was playing, this method does nothing
+    	if(currentIndex != -1 && !isPlayerStopped()) {
             // If user has option to repeat song selected, replay the same song
             if(repeatSong) {
+                // If the player is paused, update the pause_resume button to display 'pause'
+                if(isPlayerPaused()) {
+                    for(View view : BetterThaniTunes.getAllViews())
+                        view.updatePauseResumeButton("Pause");
+                }
                 try {
-                    // If the player is paused, update the pause_resume button to display 'pause'
-                    if(player.getStatus() == BasicPlayer.PAUSED)
-                        BetterThaniTunes.view.updatePauseResumeButton("Pause");
-
-                    // Play the song
-                    controller.open(new File(songPlaying.getPath()));
+                    controller.open(new File(songPlaying));
                     controller.play();
-                } catch(BasicPlayerException e) { e.printStackTrace(); }
+                    changeVolume(gain);
+                } catch(BasicPlayerException e) {
+                    e.printStackTrace();
+                }
             }
             // User doesn't have repeat song option selected, so play next song in library
             else {
-                int index = songs.indexOf(songPlaying);
-                if(index == (songs.size() - 1)) {
-                    if(repeatPlaylist) index = 0;
+                // If song playing was last song in the play order...
+                if(currentIndex == (playOrder.size() - 1)) {
+                    // If user wants to repeat playlist, play first song in playlist
+                    if(repeatPlaylist) currentIndex = 0;
                     else {
                         stop();
                         return;
                     }
                 }
-                else index++;
-                
-                Song song = songs.get(index);
-                
-                play(song, false);
-                songPlaying = song;
-
-                BetterThaniTunes.view.updatePlayer(songPlaying);
-                BetterThaniTunes.view.updatePauseResumeButton("Pause");
+                // Else, play next song
+                else currentIndex++;
+                play(playOrder.get(currentIndex), currentIndex);
             }
         }
     }
     
     /**
-     * Method plays the previous song in the library
+     * Overridden method of nextSong method that is used solely to
+     * play the next song in playOrder once a song finishes playing
+     * @param obj useless parameter used to override method
+     * @return true if next song starts playing. False if end of playOrder is reached
+     */
+    private boolean nextSong(Object obj) {
+        // If user has option to repeat song selected, replay the same song
+        if(repeatSong) {
+            // If the player is paused, update the pause_resume button to display 'pause'
+            if(isPlayerPaused()) {
+                for(View view : BetterThaniTunes.getAllViews())
+                    view.updatePauseResumeButton("Pause");
+            }
+            try {
+                controller.open(new File(songPlaying));
+                controller.play();
+                changeVolume(gain);
+                return true;
+            } catch(BasicPlayerException e) {
+                e.printStackTrace();
+                return false;
+            }
+        }
+        else {
+            // If song playing was last song in the play order...
+            if(currentIndex == (playOrder.size() - 1)) {
+                // If user wants to repeat playlist, play first song in playlist
+                if(repeatPlaylist) currentIndex = 0;
+                else {
+                    stop();
+                    return false;
+                }
+            }
+            else currentIndex++;
+            
+            play(playOrder.get(currentIndex), currentIndex);
+            return true;
+        }
+    }
+    
+    /**
+     * Method plays the previous song in the library.
      */
     public void previousSong() {
     	// If external song is playing or no song is playing, don't do anything
-    	if(!isExternalSongPlaying && isPlayerActive()) {
+    	if(currentIndex != -1 && isPlayerActive()) {
             // If user has option to repeat song selected, replay the same song
             if(repeatSong) {
+                // If the player is paused, update the pause_resume button of all windows to display 'pause'
+                if(isPlayerPaused()) {
+                    for(View view : BetterThaniTunes.getAllViews())
+                        view.updatePauseResumeButton("Pause");
+                }
                 try {
-                    // If the player is paused, update the pause_resume button to display 'pause'
-                    if(player.getStatus() == BasicPlayer.PAUSED)
-                        BetterThaniTunes.view.updatePauseResumeButton("Pause");
-
-                    // Play the song
-                    controller.open(new File(songPlaying.getPath()));
+                    controller.open(new File(songPlaying));
                     controller.play();
-                } catch(BasicPlayerException e) { e.printStackTrace(); }
+                    changeVolume(gain);
+                    
+                    // Update song area of all windows to display song info of new song
+                    for(View view : BetterThaniTunes.getAllViews())
+                        view.updatePlayer(new Song(songPlaying), secondsPlayed);
+                } catch(BasicPlayerException e) {
+                    e.printStackTrace();
+                }
             }
             // User doesn't have repeat song option selected, so play previous song in library
             else {
-                int index = songs.indexOf(songPlaying);
-                if(index == 0) {
-                    if(repeatPlaylist) index = songs.size() - 1;
+                // If the song played is past 2 seconds, just restart it
+                if(secondsPlayed > 2);
+                // Else, try and play the previous song
+                else if(currentIndex == 0) {
+                    if(repeatPlaylist) currentIndex = playOrder.size() - 1;
                     else {
                         stop();
                         return;
                     }
                 }
-                else index--;
+                else currentIndex--;
                 
-                Song song = songs.get(index);
-                
-                play(song, false);
-                songPlaying = song;
-
-                BetterThaniTunes.view.updatePlayer(songPlaying);
-                BetterThaniTunes.view.updatePauseResumeButton("Pause");
+                play(playOrder.get(currentIndex), currentIndex);
             }
         }
     }
     
+    /**
+     * Method returns the playing status of the player
+     * @return true if the player is playing. Otherwise, false
+     */
+    public boolean isPlayerPlaying() {
+        return player.getStatus() == BasicPlayer.PLAYING;
+    }
+    
+    /**
+     * Method returns the paused status of the player
+     * @return true if the player is paused. Otherwise, false
+     */
+    public boolean isPlayerPaused() {
+        return player.getStatus() == BasicPlayer.PAUSED;
+    }
+    
+    /**
+     * Method returns the stopped status of the player
+     * @return true if the player is stopped. Otherwise, false
+     */
+    public boolean isPlayerStopped() {
+        return player.getStatus() == BasicPlayer.STOPPED;
+    }
+    
+    /**
+     * Method returns the active status of the player
+     * @return true if the player is playing or paused. Otherwise, false
+     */
     public boolean isPlayerActive() {
-        if(player.getStatus() == BasicPlayer.PLAYING || player.getStatus() == BasicPlayer.PAUSED)
-            return true;
-        return false;
+        return isPlayerPlaying() || isPlayerPaused();
     }
     
-    public void updateRepeatPlaylistStatus(boolean repeat) {
-        this.repeatPlaylist = repeat;
+    /**
+     * Method updates whether the playOrder should be repeated after reaching the last song
+     * @param repeatPlaylist the value to determine if playOrder should repeat
+     */
+    public void updateRepeatPlaylistStatus(boolean repeatPlaylist) {
+        this.repeatPlaylist = repeatPlaylist;
+        for(View view : BetterThaniTunes.getAllViews())
+            view.updateRepeatPlaylistButton(repeatPlaylist);
     }
     
-    public void updateRepeatSongStatus(boolean repeat) {
-    	this.repeatSong = repeat;
+    /**
+     * Method updates whether the song should be repeated after playing
+     * @param repeatSong the value to determine if the song should repeat
+     */
+    public void updateRepeatSongStatus(boolean repeatSong) {
+    	this.repeatSong = repeatSong;
+        for(View view : BetterThaniTunes.getAllViews())
+            view.updateRepeatSongButton(repeatSong);
     }
     
+    @Override
     public void stateUpdated(BasicPlayerEvent e) {
-    	display("\nState updated: " + e.toString());
-    	if(songPlaying != null && e.toString().substring(0,3).equals("EOM")) {
-            while(player.getStatus() != BasicPlayer.STOPPED);
-            nextSong();
+    	System.out.println("\nState updated: " + e.toString());
+        // If a song has just finished playing (the next button wasn't pressed)
+    	if(!songPlaying.equals("") && e.toString().substring(0,3).equals("EOM")) {
+            
+            // Wait for the player to officially stop
+            while(!isPlayerStopped());
+            
+            // Try and play the next song
+            if(!nextSong(0)) {
+                // If the next song doesn't play, clear the song area of all windows
+                for(View view : BetterThaniTunes.getAllViews())
+                    view.clearPlayer();
+            }
     	}
     }
     
+    @Override
     public void opened(Object stream, Map properties) {
-    	display("\nOpened: " + properties.toString());
+        System.out.println("\nOpened: " + properties.toString());
     }
     
+    @Override
     public void progress(int bytesread, long ms, byte[] pcmdata, Map properties) {
-        /*display("\nprogress: {microseconds: " + properties.get("mp3.position.microseconds") + "/" + songPlaying.getDuration()
-                + ", bytes: " + properties.get("mp3.position.byte") + "/" + songPlaying.getBytes()
-                + ", frames: " + properties.get("mp3.frame") + "/" + songPlaying.getFrames() + "}\r");*/
+        // Number of seconds is in microseconds, so convert it into seconds
+        long secondsPlayed = ((long)properties.get("mp3.position.microseconds")/1000000);
+        
+        /* If the seconds displayed isn't up to date, refresh
+           all views to display correct song progression */
+        if(secondsPlayed != this.secondsPlayed) {
+            this.secondsPlayed = secondsPlayed;
+            for(View view : BetterThaniTunes.getAllViews())
+                view.updatePlayer(new Song(songPlaying), secondsPlayed);
+        }
     }
     
+    @Override
     public void setController(BasicController controller) {
-    	display("\nsetController: " + controller);
-    }
-    
-    public void display(String s) {
-    	if(out != null) out.print(s);
+    	System.out.println("\nsetController: " + controller);
     }
 }
