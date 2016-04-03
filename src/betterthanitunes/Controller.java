@@ -35,7 +35,6 @@ public class Controller implements BasicPlayerListener {
     public Controller() {
     	player.addBasicPlayerListener(this);
     	controller = (BasicController)player;
-    	//this.setController(controller);
         
         genres.add("Hip-Hop");
         genres.add("Classical");
@@ -49,13 +48,6 @@ public class Controller implements BasicPlayerListener {
         database = new DatabaseModel();
         if(!database.createConnection()) System.exit(0);
         
-        initializeSongs();
-    }
-    
-    /**
-     * Method retrieves all songs in database and adds them to the controller
-     */
-    private void initializeSongs() {
         Object[][] songData = returnAllSongs("Library");
         for(int i = 0; i < songData.length; i++)
             songs.put(songData[i][6].toString(), new Song(songData[i][6].toString()));
@@ -84,6 +76,15 @@ public class Controller implements BasicPlayerListener {
      */
     public double getGain() {
         return gain;
+    }
+    
+    /**
+     * Method determines whether a song exists in the library
+     * @param path the desired song to check
+     * @return true if the song exists in the library. Otherwise, false
+     */
+    public boolean songExists(String path) {
+        return songs.containsKey(path);
     }
     
     /**
@@ -119,6 +120,32 @@ public class Controller implements BasicPlayerListener {
     }
     
     /**
+     * Method updates one attribute of a song in the database
+     * @param songPath the desired song to update
+     * @param updatedColumn the column relating the view table and database table
+     * @param updatedValue the value to update the database row
+     * @return true if the update in the database was successful. Otherwise, false
+     */
+    public boolean updateSong(String songPath, int updatedColumn, Object updatedValue) {
+        if(database.updateSong(songPath, updatedColumn, updatedValue)) {
+            songs.get(songPath).setArtist(updatedValue.toString());
+            /*
+                songs.get(songPath).saveSong(songPath);
+                This line needs to work but it currently doesn't. Without it,
+                songs will still display the original tag info they had when
+                they were created. The database and song table will contain the
+                changes though.
+            */
+            if(songPath.equals(songPlaying)) {
+                for(View view : BetterThaniTunes.getAllViews())
+                    view.updatePlayer(songs.get(songPlaying), secondsPlayed);
+            }
+            return true;
+        }
+        else return false;
+    }
+    
+    /**
      * Method gets a specific song from the Library
      * @param path the key of the Song object in the map
      * @return the Song object corresponding to it's key (path)
@@ -127,10 +154,20 @@ public class Controller implements BasicPlayerListener {
         return songs.get(path);
     }
     
-    public boolean doesSongAlreadyExist(String path) {
-        return songs.containsKey(path);
+    /**
+     * Method gets all of the attributes for one row in the Songs table
+     * @param path the specific row to pull from the databse
+     * @return array of Objects that are attributes for a database row
+     */
+    public Object[] getSongData(String path) {
+        return database.returnSong(path);
     }
     
+    /**
+     * Method returns the data for all songs in a playlist from the database
+     * @param playlistName the desired playlist
+     * @return 2D Object array of songs and their attributes
+     */
     public Object[][] returnAllSongs(String playlistName) {
         return database.returnAllSongs(playlistName);
     }

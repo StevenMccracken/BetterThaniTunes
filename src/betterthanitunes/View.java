@@ -37,6 +37,8 @@ import javax.swing.JTree;
 import javax.swing.SwingUtilities;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.table.DefaultTableModel;
@@ -58,24 +60,25 @@ import javax.swing.tree.TreeSelectionModel;
  * @author Mark Saavedra
  */
 public class View extends JFrame {
-    JPanel framePanel, controlPanel, songInfoPanel, bottomPanel;
-    JScrollPane songTableScrollPane, playlistTreeScrollPane;
-    JTable songTable;
-    JTree playlistTree;
-    DefaultTableModel tableModel;
-    DefaultTreeModel treeModel;
-    JButton play, stop, pause_resume, next, previous;
-    JCheckBox repeatPlaylist, repeatSong;
-    JSlider volumeSlider;
-    JMenuBar menuBar;
-    JPopupMenu songTablePopupMenu, sidePanelPopupMenu;
-    JTextPane currentSong;
-    JFileChooser fileChooser;
-    DefaultMutableTreeNode playlistTreeRoot, nextNode;
-    Controller controller;
-    String currentPlaylist;
-    String[] tableHeaders = {"Title", "Artist", "Album", "Year", "Genre", "Comment", "Path", "ID"};
-    Object[][] songData;
+    private JPanel framePanel, controlPanel, songInfoPanel, bottomPanel;
+    private JScrollPane songTableScrollPane, playlistTreeScrollPane;
+    private JTable songTable;
+    private JTree playlistTree;
+    private DefaultTableModel tableModel;
+    private DefaultTreeModel treeModel;
+    private JButton play, stop, pause_resume, next, previous;
+    private JCheckBox repeatPlaylist, repeatSong;
+    private JSlider volumeSlider;
+    private JMenuBar menuBar;
+    private JPopupMenu songTablePopupMenu, sidePanelPopupMenu;
+    private JTextPane currentSong;
+    private JFileChooser fileChooser;
+    private DefaultMutableTreeNode playlistTreeRoot, nextNode;
+    private final Controller controller;
+    private String currentPlaylist;
+    private final String[] tableHeaders = {"Title", "Artist", "Album", "Year", "Genre", "Comment", "Path", "ID"};
+    private Object[][] songData;
+    private boolean disableTableModelListener = false;
     
     /**
      * Default constructor creates a BetterThaniTunes
@@ -192,6 +195,7 @@ public class View extends JFrame {
      * @param playlistName the playlist that the window is currently displaying
      */
     public void updateSongTableView(String playlistName) {
+        disableTableModelListener = true;
         // Clear the table of all existing rows
         for(int row = tableModel.getRowCount() - 1; row >= 0; row--)
             tableModel.removeRow(row);
@@ -203,6 +207,7 @@ public class View extends JFrame {
         
         // Update tableModel to alert table that new rows have been added
         tableModel.fireTableDataChanged();
+        disableTableModelListener = false;
     }
     
     /**
@@ -238,11 +243,13 @@ public class View extends JFrame {
                     // Create a Song object from the file
                     Song song = new Song(file.getPath());
                     // If the song already exists in the library, don't do anything
-                    if(!controller.doesSongAlreadyExist(song.getPath())) {
+                    if(!controller.songExists(song.getPath())) {
                         // Else, add it to the library and the current playlist
                         if(controller.addSong(song, currentPlaylist)) {
                             Object[] rowData = {song.getTitle(),song.getArtist(),song.getAlbum(),song.getYear(),controller.genres.get(song.getGenre()),song.getComment()};
+                            disableTableModelListener = true;
                             tableModel.addRow(rowData);
+                            disableTableModelListener = false;
                         }
                     }
                 }
@@ -278,8 +285,11 @@ public class View extends JFrame {
                     for(int row = rows.length-1; row >= 0; row--) {
                         Song song = new Song(songTable.getValueAt(rows[row], 6).toString());
                         // Remove each song from the database and the current window's playlist table
-                        if(controller.deleteSong(song, currentPlaylist, (int)songTable.getValueAt(rows[row],7)))
+                        if(controller.deleteSong(song, currentPlaylist, (int)songTable.getValueAt(rows[row],7))) {
+                            disableTableModelListener = true;
                             tableModel.removeRow(rows[row]);
+                            disableTableModelListener = false;
+                        }
                     }
                     // Update all the other windows
                     if(currentPlaylist.equals("Library"))
@@ -621,6 +631,41 @@ public class View extends JFrame {
         }
     }
     
+    /**
+     * Class defines behavior for when a user changes the values of the song table.
+     */
+    class tableModelListener implements TableModelListener {
+        @Override
+        public void tableChanged(TableModelEvent e) {
+            // If the table model is being refreshed, don't execute this code
+            if(!disableTableModelListener) {
+                int selectedRow = e.getFirstRow();
+                int selectedCol = e.getColumn();
+                
+                String songPath = tableModel.getValueAt(selectedRow, 6).toString();
+                Object[] originalRow = controller.getSongData(songPath);
+                Object value = tableModel.getValueAt(selectedRow, selectedCol); // Cell that user clicked
+                
+                // If original row was successfully retrieved from the database & the user actually changed a cell...
+                if((originalRow != null) && (!value.equals(originalRow[selectedCol]))) {
+                    // Update the song in the database
+                    if(controller.updateSong(songPath, selectedCol, value)) {
+                        // Refresh all windows
+                         BetterThaniTunes.updateWindows(currentPlaylist);
+                         if(BetterThaniTunes.getView(0).getCurrentPlaylist().equals("Library"))
+                             BetterThaniTunes.updateLibrary();
+                    }
+                    else { // Bad update, so remove the change
+                        disableTableModelListener = true;
+                        tableModel.setValueAt(originalRow[selectedCol], selectedRow, selectedCol);
+                        disableTableModelListener = false;
+                        tableModel.fireTableDataChanged();
+                    }
+                }
+            }
+        }
+    }
+    
     public final void setupFileChooser() {
         fileChooser = new JFileChooser();
         fileChooser.setFileFilter(new FileNameExtensionFilter("MP3 Files", "mp3"));
@@ -632,6 +677,8 @@ public class View extends JFrame {
         songData = controller.returnAllSongs(currentPlaylist);
         
         tableModel = new DefaultTableModel(songData, tableHeaders);
+        tableModel.addTableModelListener(new tableModelListener());
+        
         songTable = new JTable(tableModel);
         songTable.addMouseListener(new songTablePopupMenuListener());
         
@@ -653,7 +700,7 @@ public class View extends JFrame {
                     if(dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
                         dtde.acceptDrop(DnDConstants.ACTION_COPY_OR_MOVE);
                         Transferable t = dtde.getTransferable();
-                        List fileList = null;
+                        List fileList;
                         try {
                             fileList = (List)t.getTransferData(DataFlavor.javaFileListFlavor);
                             if(fileList.size() > 0) {

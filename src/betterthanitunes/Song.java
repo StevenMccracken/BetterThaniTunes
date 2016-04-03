@@ -6,12 +6,11 @@ import com.mpatric.mp3agic.ID3v1;
 import com.mpatric.mp3agic.ID3v24Tag;
 import com.mpatric.mp3agic.Mp3File;
 import com.mpatric.mp3agic.InvalidDataException;
-import com.mpatric.mp3agic.NotSupportedException;
 import com.mpatric.mp3agic.UnsupportedTagException;
 
 /**
- * Class represents an MP3 song, holding the path of the file
- * and the tag information all in one object. 
+ * Class represents an MP3 song, holding the path of
+ * the file and the tag information all in one object. 
  * @author Steven McCracken
  * @author Mark Saavedra
  */
@@ -25,7 +24,7 @@ public class Song {
         try {
             file = new Mp3File(fullPath);
             this.fullPath = fullPath;
-            this.filename = new File(fullPath).getName();
+            filename = new File(fullPath).getName();
 
             if(file.hasId3v2Tag()) {
                 tag = file.getId3v2Tag();
@@ -50,19 +49,19 @@ public class Song {
      */
     public void checkTags() {
         boolean changesMade = false;
-        if(tag.getTitle() == "" || tag.getTitle() == null) {
-            tag.setTitle(getFilename());
+        if(tag.getTitle() == null || tag.getTitle().equals("")) {
+            tag.setTitle(filename);
             changesMade = true;
         }
-        if(tag.getArtist() == "" || tag.getArtist() == null) {
+        if(tag.getArtist() == null || tag.getArtist().equals("")) {
             tag.setArtist("Unknown");
             changesMade = true;
         }
-        if(tag.getAlbum() == "" || tag.getAlbum() == null) {
+        if(tag.getAlbum() == null || tag.getAlbum().equals("")) {
             tag.setAlbum("Unknown");
             changesMade = true;
         }
-        if(tag.getYear() == "" || tag.getYear() == null) {
+        if(tag.getYear() == null || tag.getYear().equals("")) {
             tag.setYear("Unknown");
             changesMade = true;
             
@@ -71,19 +70,18 @@ public class Song {
             tag.setGenre(0);
             changesMade = true;
         }
-        if(tag.getComment() == "" || tag.getComment() == null) {
+        if(tag.getComment() == null || tag.getComment().equals("")) {
             tag.setComment(" ");
             changesMade = true;
         }
         if(changesMade) file.setId3v1Tag(tag);
     }
     
+    /**
+     * Method saves the file. Currently doesn't work
+     * @param path the path to save the file to
+     */
     public void saveSong(String path) {
-        try {
-            file.save(path);
-        } catch (NotSupportedException | IOException e) {
-            e.printStackTrace();
-        }
     }
     
     // Method returns the name of the file
