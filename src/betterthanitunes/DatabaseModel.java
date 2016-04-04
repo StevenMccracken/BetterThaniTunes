@@ -178,6 +178,60 @@ public class DatabaseModel {
     }
     
     /**
+     * Method updates an attribute of a row in the Songs table
+     * @param path the song to update
+     * @param col the index of the column in the Songs table
+     * @param updatedValue the new value to put into the table
+     * @return true if the update was successful. Otherwise, false;
+     */
+    public boolean updateSong(String path, int col, Object updatedValue) {
+        PreparedStatement statement;
+        String[] attributes = {"title", "artist", "album", "yearCreated", "genre", "comment"};
+        String query = "UPDATE Songs SET " + attributes[col] + " = ? WHERE path = ?";
+        try {
+            statement = connection.prepareStatement(query);
+            if(updatedValue.getClass() == Integer.class || (updatedValue.getClass() == Double.class && col == 4))
+                statement.setInt(1, (int)updatedValue);
+            else if(updatedValue.getClass() == String.class)
+                statement.setString(1, updatedValue.toString());
+            else
+                statement.setObject(col, updatedValue);
+            
+            statement.setString(2, path);
+            statement.executeUpdate();
+            return true;
+        } catch(SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    /**
+     * Method returns a row from the Songs table
+     * @param path the desired song to select
+     * @return array of Objects representing data in the table
+     */
+    public Object[] returnSong(String path) {
+        PreparedStatement statement;
+        Object[] rowData = null;
+        try {
+            statement = connection.prepareStatement("SELECT * FROM  Songs WHERE path = ?");
+            statement.setString(1, path);
+            ResultSet result = statement.executeQuery();
+            
+            if(result.next()) {
+                rowData = new Object[7];
+                for(int i = 0; i < 7; i++)
+                    rowData[i] = result.getString(i+1);
+            }
+        }
+        catch(SQLException e) {
+            e.printStackTrace();
+        }
+        return rowData;
+    }
+    
+    /**
      * Method returns all songs from the database
      * @param playlistName the name of the playlist to find songs in
      * @return 2D array containing song info for table in GUI

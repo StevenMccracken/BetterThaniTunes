@@ -84,7 +84,7 @@ public class BetterThaniTunes {
     }
     
     /**
-     * Method updates the first View window created
+     * Method updates the first View window created.
      */
     public static void updateLibrary() {
         views.get(0).updateSongTableView("Library");
