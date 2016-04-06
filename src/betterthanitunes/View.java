@@ -7,7 +7,9 @@ import java.util.List;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.StringSelection;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.dnd.DnDConstants;
@@ -18,8 +20,11 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import javax.activation.ActivationDataFlavor;
+import javax.swing.DropMode;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
@@ -34,7 +39,9 @@ import javax.swing.JSlider;
 import javax.swing.JTable;
 import javax.swing.JTextPane;
 import javax.swing.JTree;
+import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
+import javax.swing.TransferHandler;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.event.TableModelEvent;
@@ -666,6 +673,41 @@ public class View extends JFrame {
         }
     }
     
+    class TS extends TransferHandler {
+        public TS() {}
+        
+        @Override
+        public int getSourceActions(JComponent c) {
+            return MOVE;
+        }
+        
+        @Override
+        protected Transferable createTransferable(JComponent source) {
+            return new StringSelection(((JTable)source).getModel().getValueAt(((JTable)source).getSelectedRow(), ((JTable)source).getSelectedColumn()).toString());
+        }
+        
+        @Override
+        protected void exportDone(JComponent source, Transferable data, int action) {
+            ((JTable)source).getModel().setValueAt("", ((JTable)source).getSelectedRow(), ((JTable)source).getSelectedColumn());
+        }
+        
+        @Override
+        public boolean canImport(TransferSupport support) {
+            return true;
+        }
+        
+        @Override
+        public boolean importData(TransferSupport support) {
+            JTable table = (JTable)support.getComponent();
+            try {
+                table.setValueAt(support.getTransferable().getTransferData(DataFlavor.stringFlavor), table.getSelectedRow(), table.getSelectedColumn());
+            } catch(UnsupportedFlavorException | IOException e) {
+                e.printStackTrace();
+            }
+            return super.importData(support);
+        }
+    }
+    
     public final void setupFileChooser() {
         fileChooser = new JFileChooser();
         fileChooser.setFileFilter(new FileNameExtensionFilter("MP3 Files", "mp3"));
@@ -734,7 +776,12 @@ public class View extends JFrame {
                         songTable.setRowSelectionInterval(row, row);
                     dtde.acceptDrag(DnDConstants.ACTION_COPY_OR_MOVE);
                 }
-            });
+            }
+        );
+        
+        songTable.setDragEnabled(true);
+        songTable.setDropMode(DropMode.USE_SELECTION);
+        songTable.setTransferHandler(new TS());
     }
     
     public final void setupMenuBar() {
