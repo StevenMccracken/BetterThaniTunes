@@ -12,14 +12,6 @@ public class BetterThaniTunes {
     private static ArrayList<View> views;
     private static String dragSourcePlaylist = "";
     
-    public static String getDragSourcePlaylist() {
-        return dragSourcePlaylist;
-    }
-    
-    public static void setDragSourcePlaylist(String source) {
-        dragSourcePlaylist = source;
-    }
-    
     public static void main(String[] args) {
         views = new ArrayList<>();
         views.add(new View());
@@ -71,6 +63,22 @@ public class BetterThaniTunes {
      */
     public static void removeView(View view) {
         views.remove(view);
+    }
+    
+    /**
+     * Method gets the name of the playlist that a drag of rows originated from
+     * @return the name of the playlist
+     */
+    public static String getDragSourcePlaylist() {
+        return dragSourcePlaylist;
+    }
+    
+    /**
+     * Method sets the name of the playlist that a drag of rows originated from
+     * @param source the name of the playlist
+     */
+    public static void setDragSourcePlaylist(String source) {
+        dragSourcePlaylist = source;
     }
     
     /**
