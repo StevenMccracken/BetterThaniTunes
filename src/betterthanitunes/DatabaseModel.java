@@ -295,4 +295,14 @@ public class DatabaseModel {
         }
         return playlists;
     }
+    
+    public void shutdown() {
+        if(connection != null) {
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 }
