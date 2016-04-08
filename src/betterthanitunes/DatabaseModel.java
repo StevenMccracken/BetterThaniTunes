@@ -296,6 +296,10 @@ public class DatabaseModel {
         return playlists;
     }
     
+    /**
+     * Method closes the connection object, disconnecting
+     * the program from the database.
+     */
     public void shutdown() {
         if(connection != null) {
             try {

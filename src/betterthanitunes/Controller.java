@@ -507,6 +507,9 @@ public class Controller implements BasicPlayerListener {
     	System.out.println("\nsetController: " + controller);
     }
     
+    /**
+     * Method disconnects the connection to the database.
+     */
     public void disconnectDatabase() {
         database.shutdown();
     }
