@@ -10,6 +10,15 @@ import java.util.ArrayList;
  */
 public class BetterThaniTunes {
     private static ArrayList<View> views;
+    private static String dragSourcePlaylist = "";
+    
+    public static String getDragSourcePlaylist() {
+        return dragSourcePlaylist;
+    }
+    
+    public static void setDragSourcePlaylist(String source) {
+        dragSourcePlaylist = source;
+    }
     
     public static void main(String[] args) {
         views = new ArrayList<>();

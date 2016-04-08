@@ -7,9 +7,8 @@ import java.util.List;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Point;
-import java.awt.Rectangle;
 import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.StringSelection;
+import static java.awt.datatransfer.DataFlavor.stringFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.dnd.DnDConstants;
@@ -20,11 +19,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import javax.activation.ActivationDataFlavor;
-import javax.swing.DropMode;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
@@ -39,9 +35,7 @@ import javax.swing.JSlider;
 import javax.swing.JTable;
 import javax.swing.JTextPane;
 import javax.swing.JTree;
-import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
-import javax.swing.TransferHandler;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.event.TableModelEvent;
@@ -93,7 +87,7 @@ public class View extends JFrame {
      */
     public View() {
         super("BetterThaniTunes");
-        this.controller = new Controller();
+        controller = new Controller();
         
         setupFileChooser();
         setupSongTable("Library");
@@ -104,7 +98,7 @@ public class View extends JFrame {
         setupControlPanel();
         setupSongArea();
         setupFramePanel(false);
-        setupGuiWindow(false);
+        setupGuiWindow();
     }
     
     /**
@@ -126,7 +120,7 @@ public class View extends JFrame {
         setupControlPanel();
         setupSongArea();
         setupFramePanel(true);
-        setupGuiWindow(true);
+        setupGuiWindow();
     }
     
     /**
@@ -555,7 +549,6 @@ public class View extends JFrame {
                 String path = songTable.getValueAt(songTable.getSelectedRow(), 6).toString();
                 controller.play(path, songTable.getSelectedRow());
             }
-            else System.out.println("Select a song first to play it!");
         }
     }
     
@@ -657,7 +650,7 @@ public class View extends JFrame {
                 if((originalRow != null) && (!value.equals(originalRow[selectedCol]))) {
                     // Update the song in the database
                     if(controller.updateSong(songPath, selectedCol, value)) {
-                        // Refresh all windows
+                        // Update all windows
                          BetterThaniTunes.updateWindows(currentPlaylist);
                          if(BetterThaniTunes.getView(0).getCurrentPlaylist().equals("Library"))
                              BetterThaniTunes.updateLibrary();
@@ -673,38 +666,97 @@ public class View extends JFrame {
         }
     }
     
-    class TS extends TransferHandler {
-        public TS() {}
-        
+    /**
+     * Class defines behavior for when a user drags and drops rows of a song table
+     * or drags files into the application window and onto a song table.
+     */
+    class tableDragDropListener extends DropTarget {
+        /**
+         * Method handles files and rows from other tables being
+         * dropped onto this View objects current playlist table.
+         * @param dtde the event created when something is dropped
+         */
         @Override
-        public int getSourceActions(JComponent c) {
-            return MOVE;
-        }
-        
-        @Override
-        protected Transferable createTransferable(JComponent source) {
-            return new StringSelection(((JTable)source).getModel().getValueAt(((JTable)source).getSelectedRow(), ((JTable)source).getSelectedColumn()).toString());
-        }
-        
-        @Override
-        protected void exportDone(JComponent source, Transferable data, int action) {
-            ((JTable)source).getModel().setValueAt("", ((JTable)source).getSelectedRow(), ((JTable)source).getSelectedColumn());
-        }
-        
-        @Override
-        public boolean canImport(TransferSupport support) {
-            return true;
-        }
-        
-        @Override
-        public boolean importData(TransferSupport support) {
-            JTable table = (JTable)support.getComponent();
-            try {
-                table.setValueAt(support.getTransferable().getTransferData(DataFlavor.stringFlavor), table.getSelectedRow(), table.getSelectedColumn());
-            } catch(UnsupportedFlavorException | IOException e) {
-                e.printStackTrace();
+        public synchronized void drop(DropTargetDropEvent dtde) {
+            // Get the transferable data from the drop
+            Transferable transferable = dtde.getTransferable();
+            
+            // If the user dropped files onto the table
+            if(dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+                // Get the files dropped into a list
+                dtde.acceptDrop(DnDConstants.ACTION_COPY_OR_MOVE);
+                List fileList = null;
+                try {
+                    fileList = (List)transferable.getTransferData(DataFlavor.javaFileListFlavor);
+                } catch(UnsupportedFlavorException | IOException e) {
+                    e.printStackTrace();
+                }
+                if(fileList != null && fileList.size() > 0) {
+                    songTable.clearSelection();
+                    // Create song objects from files and add them to the playlist
+                    for(Object file : fileList) {
+                        if(file instanceof File) {
+                            File mp3File = (File)file;
+                            addSong(new Song(mp3File.getAbsolutePath()), currentPlaylist);
+                        }
+                    }
+                    // Update all windows
+                    BetterThaniTunes.updateWindows(currentPlaylist);
+                    if(BetterThaniTunes.getView(0).getCurrentPlaylist().equals("Library"))
+                        BetterThaniTunes.updateLibrary();
+                }
             }
-            return super.importData(support);
+            // Else if the user dropped rows from another table onto a table
+            else if(dtde.isDataFlavorSupported(DataFlavor.stringFlavor)) {
+                /* If the source playlist of the drag isn't equal to the drop
+                playlist and the drop playlist isn't the Library, accept ihe drop */
+                if(!BetterThaniTunes.getDragSourcePlaylist().equals(currentPlaylist) && !currentPlaylist.equals("Library")) {
+                    dtde.acceptDrop(DnDConstants.ACTION_COPY_OR_MOVE);
+                    // Get the data from the drop as one String
+                    String data = "";
+                    try {
+                        data = transferable.getTransferData(stringFlavor).toString();
+                    } catch(UnsupportedFlavorException | IOException e) {
+                        e.printStackTrace();
+                    }
+                    // The String data has rows separated by \n and cols separated by \t
+                    String[] droppedRows = data.split("\n");
+                    for(String droppedRow : droppedRows) {
+                        // Get the path from the 7th column of each row. Add each song to the playlist
+                        String[] columns = droppedRow.split("\t");
+                        addSong(new Song(columns[6]), currentPlaylist);
+                    }
+                    // Update all windows
+                    BetterThaniTunes.updateWindows(currentPlaylist);
+                    if(BetterThaniTunes.getView(0).getCurrentPlaylist().equals("Library"))
+                        BetterThaniTunes.updateLibrary();
+                }
+                else dtde.rejectDrop();
+            }
+            else dtde.rejectDrop();
+            // Reset the source so that the source of new drags can be determined
+            BetterThaniTunes.setDragSourcePlaylist("");
+        }
+
+        /**
+         * Method determines which playlist rows in a table were
+         * initially dragged from and visually shows in the
+         * table where the dragged songs will drop.
+         * @param dtde the event created when something is dragged
+         */
+        @Override
+        public synchronized void dragOver(DropTargetDragEvent dtde) {
+            // If the source hasn't been determined yet, save that source until the drag is finished
+            if(BetterThaniTunes.getDragSourcePlaylist().length() == 0)
+                BetterThaniTunes.setDragSourcePlaylist(currentPlaylist);
+
+            Point point = dtde.getLocation();
+            int row = songTable.rowAtPoint(point);
+            if(row < 0)
+                songTable.clearSelection();
+            else
+                songTable.setRowSelectionInterval(row, row);
+            dtde.acceptDrag(DnDConstants.ACTION_COPY_OR_MOVE);
         }
     }
     
@@ -724,6 +776,10 @@ public class View extends JFrame {
         songTable = new JTable(tableModel);
         songTable.addMouseListener(new songTablePopupMenuListener());
         
+        // Add drag and drop functionality to song table
+        songTable.setDragEnabled(true);
+        songTable.setDropTarget(new tableDragDropListener());
+        
         // Hide columns that show song path & song ID in playlists
         for(int i = 6; i <= 7; i++) {
             songTable.getColumnModel().getColumn(i).setMinWidth(0);
@@ -731,57 +787,7 @@ public class View extends JFrame {
             songTable.getColumnModel().getColumn(i).setResizable(false);
         }
         
-        // Place song table in a scroll pane
         songTableScrollPane = new JScrollPane(songTable);
-        
-        // Add drag and drop functionality to song table
-        songTable.setDropTarget(
-            new DropTarget() {
-                @Override
-                public synchronized void drop(DropTargetDropEvent dtde) {
-                    if(dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
-                        dtde.acceptDrop(DnDConstants.ACTION_COPY_OR_MOVE);
-                        Transferable t = dtde.getTransferable();
-                        List fileList;
-                        try {
-                            fileList = (List)t.getTransferData(DataFlavor.javaFileListFlavor);
-                            if(fileList.size() > 0) {
-                                songTable.clearSelection();
-                                Point point = dtde.getLocation();
-                                int row = songTable.rowAtPoint(point);
-                                for(Object value : fileList) {
-                                    if(value instanceof File) {
-                                        File f = (File) value;
-                                        Song song = new Song(f.getAbsolutePath());
-                                        addSong(song, currentPlaylist);
-                                        if(BetterThaniTunes.getView(0).getCurrentPlaylist().equals("Library"))
-                                            BetterThaniTunes.updateLibrary();
-                                    }
-                                }
-                            }
-                        } catch(UnsupportedFlavorException | IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    else dtde.rejectDrop();
-                }
-                
-                @Override
-                public synchronized void dragOver(DropTargetDragEvent dtde) {
-                    Point point = dtde.getLocation();
-                    int row = songTable.rowAtPoint(point);
-                    if(row < 0)
-                        songTable.clearSelection();
-                    else
-                        songTable.setRowSelectionInterval(row, row);
-                    dtde.acceptDrag(DnDConstants.ACTION_COPY_OR_MOVE);
-                }
-            }
-        );
-        
-        songTable.setDragEnabled(true);
-        songTable.setDropMode(DropMode.USE_SELECTION);
-        songTable.setTransferHandler(new TS());
     }
     
     public final void setupMenuBar() {
@@ -931,15 +937,12 @@ public class View extends JFrame {
     }
     
     
-    public final void setupGuiWindow(boolean newWindow) {
-        this.setPreferredSize(new Dimension(1000, 700));
-        
-        if(newWindow) this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        else this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        
-        this.getContentPane().add(framePanel);
-        this.pack();
-        this.setVisible(true);
+    public final void setupGuiWindow() {
+        setPreferredSize(new Dimension(1000, 700));
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        getContentPane().add(framePanel);
+        pack();
+        setVisible(true);
     }
     
     /**
@@ -949,6 +952,10 @@ public class View extends JFrame {
     @Override
     public void dispose() {
         BetterThaniTunes.removeView(this);
-        super.dispose();
+        if(getTitle().equals("BetterThaniTunes")) {
+            controller.disconnectDatabase();
+            System.exit(0);
+        }
+        else super.dispose();
     }
 }
