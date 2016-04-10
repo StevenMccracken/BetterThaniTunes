@@ -481,6 +481,10 @@ public class View extends JFrame {
             String playlist = ((DefaultMutableTreeNode)playlistTree.getSelectionPath().getLastPathComponent()).toString();
             // Create a new window with that playlist
             BetterThaniTunes.createNewView(playlist, controller);
+            
+            // Reset the main window table to the library
+            BetterThaniTunes.updateLibrary();
+            playlistTree.setSelectionPath(new TreePath(((DefaultMutableTreeNode)playlistTreeRoot.getChildAt(0)).getPath()));
         }
     }
     
