@@ -481,6 +481,10 @@ public class View extends JFrame {
             String playlist = ((DefaultMutableTreeNode)playlistTree.getSelectionPath().getLastPathComponent()).toString();
             // Create a new window with that playlist
             BetterThaniTunes.createNewView(playlist, controller);
+            
+            // Reset the main window table to the library
+            BetterThaniTunes.updateLibrary();
+            playlistTree.setSelectionPath(new TreePath(((DefaultMutableTreeNode)playlistTreeRoot.getChildAt(0)).getPath()));
         }
     }
     
@@ -634,7 +638,7 @@ public class View extends JFrame {
     /**
      * Class defines behavior for when a user changes the values of the song table.
      */
-    class tableModelListener implements TableModelListener {
+    /*class tableModelListener implements TableModelListener {
         @Override
         public void tableChanged(TableModelEvent e) {
             // If the table model is being refreshed, don't execute this code
@@ -664,7 +668,7 @@ public class View extends JFrame {
                 }
             }
         }
-    }
+    }*/
     
     /**
      * Class defines behavior for when a user drags and drops rows of a song table
@@ -771,7 +775,7 @@ public class View extends JFrame {
         songData = controller.returnAllSongs(currentPlaylist);
         
         tableModel = new DefaultTableModel(songData, tableHeaders);
-        tableModel.addTableModelListener(new tableModelListener());
+        //tableModel.addTableModelListener(new tableModelListener());
         
         songTable = new JTable(tableModel);
         songTable.addMouseListener(new songTablePopupMenuListener());
