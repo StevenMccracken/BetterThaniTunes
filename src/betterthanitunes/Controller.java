@@ -199,6 +199,26 @@ public class Controller implements BasicPlayerListener {
     }
     
     /**
+     * Method sets the column visibility for a single column in a playlist
+     * @param playlist the current playlist containing the column
+     * @param column the name of the column
+     * @param visibility whether the column is visible or not
+     * @return true if the column visibility was updated. Otherwise, false
+     */
+    public boolean setColumnVisibility(String playlist, String column, boolean visibility) {
+        return database.updateColumnVisibility(playlist, column, visibility);
+    }
+    
+    /**
+     * Method gets the column visibility for all column in a playlist
+     * @param playlistName the name of the playlist
+     * @return an array of booleans indicating the column visibilities
+     */
+    public boolean[] getColumnVisibility(String playlistName) {
+        return database.returnColumnVisibility(playlistName);
+    }
+    
+    /**
      * Updates the playOrder array list to contain the order of songs as they
      * appear in a playlist, so they can be iterated over for consecutive playback
      * @param songPaths the paths of the songs

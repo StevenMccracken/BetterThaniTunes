@@ -106,4 +106,16 @@ public class BetterThaniTunes {
     public static void updateLibrary() {
         views.get(0).updateSongTableView("Library");
     }
+    
+    /**
+     * Method updates column headers of all Views displaying playlist.
+     * @param callingView the view that updated it's column headers first
+     * @param playlist the playlist who's column headers need to be updated
+     */
+    public static void updateColumnHeaders(View callingView, String playlist) {
+        for(View view: views) {
+            if((view != callingView) && (view.getCurrentPlaylist().equals(playlist)))
+                view.updateColumnVisibility();
+        }
+    }
 }

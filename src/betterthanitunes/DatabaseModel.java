@@ -33,20 +33,22 @@ public class DatabaseModel {
     }
     
     /**
-     * Method sends a query to the database, including updates and inserts to tables
+     * Method sends a query to the database, including updates, inserts, and deletes
      * @param query the statement to be executed
      * @param args the values to be placed inside the query
      * @return true if executing the prepared statement threw no exceptions. Otherwise, false
      */
-    public boolean executeStatement(String query, Object[] args) {
+    public boolean executeUpdate(String query, Object[] args) {
         PreparedStatement statement;
         try {
             statement = connection.prepareStatement(query);
             for(int i = 0; i < args.length; i++) {
                 if(args[i].getClass() == String.class)
-                    statement.setString(i+1, (String)args[i]);
+                    statement.setString(i+1, args[i].toString());
                 else if(args[i].getClass() == Integer.class)
                     statement.setInt(i+1, (int)args[i]);
+                else if(args[i].getClass() == Boolean.class)
+                    statement.setBoolean(i+1, (boolean)args[i]);
             }
             
             statement.executeUpdate();
@@ -54,6 +56,32 @@ public class DatabaseModel {
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
+        }
+    }
+    
+    /**
+     * Method sends a query to the database, including selects
+     * @param query the statement to be executed
+     * @param args the values to be placed inside the query
+     * @return a ResultSet containing the return values from the query
+     */
+    public ResultSet executeQuery(String query, Object[] args) {
+        PreparedStatement statement;
+        try {
+            statement = connection.prepareStatement(query);
+            for(int i = 0; i < args.length; i++) {
+                if(args[i].getClass() == String.class)
+                    statement.setString(i+1, args[i].toString());
+                else if(args[i].getClass() == Integer.class)
+                    statement.setInt(i+1, (int)args[i]);
+                else if(args[i].getClass() == Boolean.class)
+                    statement.setBoolean(i+1, (boolean)args[i]);
+            }
+            
+            return statement.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
         }
     }
     
@@ -67,9 +95,34 @@ public class DatabaseModel {
             System.out.println("You cannot create a playlist called " + playlistName);
             return false;
         }
-        boolean wasInserted = executeStatement("INSERT INTO Playlists VALUES (?)", new Object[] {playlistName});
-        if(!wasInserted) System.out.println("\n" + playlistName + " already exists!");
-        return wasInserted;
+        
+        // Insert playlist name into Playlists table
+        boolean wasPlaylistInserted = executeUpdate("INSERT INTO Playlists VALUES (?)", new Object[] {playlistName});
+        if(!wasPlaylistInserted) {
+            System.out.println("\n" + playlistName + " already exists!");
+            return false;
+        }
+        
+        // Insert column visibility info into Columns table
+        String columnInsertQuery = "INSERT INTO Columns (playlistName, columnName, visible, columnOrder) VALUES" +
+                                    "('" + playlistName + "', 'Title', TRUE, 1)," +
+                                    "('" + playlistName + "', 'Artist', TRUE, 2)," +
+                                    "('" + playlistName + "', 'Album', TRUE, 3)," +
+                                    "('" + playlistName + "', 'Year', TRUE, 4)," +
+                                    "('" + playlistName + "', 'Genre', TRUE, 5)," +
+                                    "('" + playlistName + "', 'Comment', TRUE, 6)," +
+                                    "('" + playlistName + "', 'Path', FALSE, 7)," +
+                                    "('" + playlistName + "', 'ID', FALSE, 8)";
+        
+        boolean wasColInfoInserted = executeUpdate(columnInsertQuery, new Object[]{});
+        if(!wasColInfoInserted) {
+            // Column visibility info insert failed, so delete playlist from Playlists table
+            System.out.println("\nPlaylist was inserted but column visibility setup failed!");
+            boolean wasDeleted = executeUpdate("DELETE FROM Playlists WHERE playlistName = ?", new Object[] {playlistName});
+            if(wasDeleted) System.out.println("Deleted " + playlistName + " because of this error");
+            return false;
+        }
+        return true;
     }
     
     /**
@@ -79,8 +132,9 @@ public class DatabaseModel {
      */
     public boolean deletePlaylist(String playlistName) {
         Object[] playlist = {playlistName};
-        executeStatement("DELETE FROM SongPlaylist WHERE playlistName = ?", playlist);
-        return executeStatement("DELETE FROM Playlists WHERE playlistName = ?", playlist);
+        executeUpdate("DELETE FROM SongPlaylist WHERE playlistName = ?", playlist);
+        executeUpdate("DELETE FROM Columns WHERE playlistName = ?", playlist);
+        return executeUpdate("DELETE FROM Playlists WHERE playlistName = ?", playlist);
     }
     
     /**
@@ -100,12 +154,13 @@ public class DatabaseModel {
             args = new Object[] {song.getTitle(), song.getArtist(), song.getAlbum(), song.getYear(), song.getGenre(), song.getComment(), song.getPath()};
         }
         else {
-            PreparedStatement statement;
+            ResultSet results = executeQuery("SELECT path FROM Songs WHERE path = ?", new Object[] {song.getPath()});
+            // If the query failed, results will be null
+            if(results == null)
+                return false;
             try {
-                statement = connection.prepareStatement("SELECT path FROM Songs WHERE path = ?");
-                statement.setString(1, song.getPath());
-                ResultSet results = statement.executeQuery();
-                if(results.next()) songExistsInLibrary = true;
+                if(results.next())
+                    songExistsInLibrary = true;
             } catch(SQLException e) {
                 e.printStackTrace();
                 return false;
@@ -114,18 +169,20 @@ public class DatabaseModel {
             if(!songExistsInLibrary) {
                 query = "INSERT INTO Songs VALUES (?,?,?,?,?,?,?)";
                 args = new Object[] {song.getTitle(), song.getArtist(), song.getAlbum(), song.getYear(), song.getGenre(), song.getComment(), song.getPath()};
-                executeStatement(query, args);
+                executeUpdate(query, args);
                 id = 0;
             }
             else {
+                String query2 = "SELECT MAX(id) AS ID FROM SongPlaylist WHERE playlistName = ? AND path = ?";
+                Object[] args2 = {playlistName, song.getPath()};
+                ResultSet results2 = executeQuery(query2, args2);
+                
+                if(results2 == null)
+                    return false;
                 try {
-                    statement = connection.prepareStatement("SELECT MAX(id) AS ID FROM SongPlaylist WHERE playlistName = ? AND path = ?");
-                    statement.setString(1, playlistName);
-                    statement.setString(2, song.getPath());
-                    ResultSet results = statement.executeQuery();
-                    results.next();
-                    if(results.getObject("ID") == null) id = 0;
-                    else id = results.getInt("ID") + 1;
+                    results2.next();
+                    if(results2.getObject("ID") == null) id = 0;
+                    else id = results2.getInt("ID") + 1;
                 } catch(SQLException e) {
                     e.printStackTrace();
                     return false;
@@ -137,7 +194,7 @@ public class DatabaseModel {
             args = new Object[] {playlistName, song.getPath(), id};
         }
         
-        boolean wasInserted = executeStatement(query, args);
+        boolean wasInserted = executeUpdate(query, args);
         if(songExistsInLibrary) return false;
         if (!wasInserted) System.out.println("\nUnable to add song");
         return wasInserted;
@@ -154,25 +211,25 @@ public class DatabaseModel {
         PreparedStatement statement;
         if(playlistName.equals("Library")) {
             ArrayList<String> playlists = new ArrayList<>();
+            ResultSet results = executeQuery("SELECT playlistName FROM SongPlaylist WHERE path = ?", new Object[] {song.getPath()});
+            
+            if(results == null)
+                return false;
             try {
-                statement = connection.prepareStatement("SELECT playlistName FROM SongPlaylist WHERE path = ?");
-                statement.setString(1, song.getPath());
-                ResultSet results = statement.executeQuery();
-
                 while(results.next()) 
                     playlists.add(results.getString("playlistName"));
-
             } catch(SQLException e) {
                 e.printStackTrace();
+                return false;
             }
 
             for(String playlist : playlists)
-                executeStatement("DELETE FROM SongPlaylist WHERE playlistName = ? AND path = ?", new Object[] {playlist, song.getPath()});
+                executeUpdate("DELETE FROM SongPlaylist WHERE playlistName = ? AND path = ?", new Object[] {playlist, song.getPath()});
 
-            return executeStatement("DELETE FROM Songs WHERE path = ?", new Object[] {song.getPath()});
+            return executeUpdate("DELETE FROM Songs WHERE path = ?", new Object[] {song.getPath()});
         }
         else {
-            executeStatement("DELETE FROM SongPlaylist WHERE playlistName = ? AND path = ? AND id = ?", new Object[] {playlistName, song.getPath(), id});
+            executeUpdate("DELETE FROM SongPlaylist WHERE playlistName = ? AND path = ? AND id = ?", new Object[] {playlistName, song.getPath(), id});
             return true;
         }
     }
@@ -207,26 +264,36 @@ public class DatabaseModel {
     }
     
     /**
+     * Method updates the column visibility for a column in a playlist
+     * @param playlist the playlist containing the column
+     * @param column the name of the column
+     * @param visibility the new visibility status of the column
+     * @return true if the update query succeeded. Otherwise, false
+     */
+    public boolean updateColumnVisibility(String playlist, String column, boolean visibility) {
+        String query = "UPDATE Columns SET visible = ? WHERE playlistName = ? AND columnName = ?";
+        return executeUpdate(query, new Object[] {visibility, playlist, column});
+    }
+    
+    /**
      * Method returns a row from the Songs table
      * @param path the desired song to select
      * @return array of Objects representing data in the table
      */
     public Object[] returnSong(String path) {
-        PreparedStatement statement;
         Object[] rowData = null;
-        try {
-            statement = connection.prepareStatement("SELECT * FROM  Songs WHERE path = ?");
-            statement.setString(1, path);
-            ResultSet result = statement.executeQuery();
-            
-            if(result.next()) {
-                rowData = new Object[7];
-                for(int i = 0; i < 7; i++)
-                    rowData[i] = result.getString(i+1);
+        ResultSet results = executeQuery("SELECT * FROM Songs WHERE path = ?", new Object[] {path});
+        
+        if(results != null) {
+            try {
+                if(results.next()) {
+                    rowData = new Object[7];
+                    for(int i = 0; i < 7; i++)
+                        rowData[i] = results.getString(i+1);
+                }
+            } catch(SQLException e) {
+                e.printStackTrace();
             }
-        }
-        catch(SQLException e) {
-            e.printStackTrace();
         }
         return rowData;
     }
@@ -283,21 +350,41 @@ public class DatabaseModel {
      */
     public ArrayList<String> returnAllPlaylists() {
         ArrayList<String> playlists = new ArrayList<>();
-        PreparedStatement statement;
-        try {
-            statement = connection.prepareStatement("SELECT * FROM Playlists");
-            ResultSet results = statement.executeQuery();
-            
-            while(results.next())
-                playlists.add(results.getString("playlistName"));
-        } catch(SQLException e) {
-            e.printStackTrace();
+        ResultSet results = executeQuery("SELECT * FROM Playlists WHERE playlistName != ?", new Object[]{"Library"});
+        if(results != null) {
+            try {
+                while(results.next())
+                    playlists.add(results.getString("playlistName"));
+            } catch(SQLException e) {
+                e.printStackTrace();
+            }
         }
         return playlists;
     }
     
     /**
-     * Method closes the connection object, disconnecting
+     * Method returns the column visibility for a playlist from the database
+     * @param playlistName the name of the playlist
+     * @return an array of booleans indicating which columns are visible or not
+     */
+    public boolean[] returnColumnVisibility(String playlistName) {
+        boolean[] columnVisibilities = new boolean[8];
+        String query = "SELECT visible FROM Columns WHERE playlistName = ? ORDER BY columnOrder";
+        ResultSet results = executeQuery(query, new Object[] {playlistName});
+        if(results != null) {
+            try {
+                int col = 0;
+                while(results.next())
+                    columnVisibilities[col++] = results.getBoolean(1);
+            } catch(SQLException e) {
+                e.printStackTrace();
+            }
+        }
+        return columnVisibilities;
+    }
+    
+    /**
+     * Method closes the connection, disconnecting
      * the program from the database.
      */
     public void shutdown() {
