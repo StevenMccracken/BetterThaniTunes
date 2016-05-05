@@ -37,10 +37,12 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JSlider;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.JTree;
 import javax.swing.KeyStroke;
@@ -84,6 +86,7 @@ public class View extends JFrame {
     private JMenuBar menuBar;
     private JPopupMenu songTablePopupMenu, sidePanelPopupMenu, tableHeaderPopupMenu;
     private JTextPane currentSong;
+    private JTextField secondsPlayed, secondsRemaining;
     private JFileChooser fileChooser;
     private DefaultMutableTreeNode playlistTreeRoot, nextNode;
     private final Controller controller;
@@ -91,6 +94,7 @@ public class View extends JFrame {
     private final String[] tableHeaders = {"Title", "Artist", "Album", "Year", "Genre", "Comment", "Path", "ID"};
     private Object[][] songData;
     private boolean disableTableModelListener = false;
+    private JProgressBar progressBar;
     
     /**
      * Default constructor creates a BetterThaniTunes
@@ -155,16 +159,8 @@ public class View extends JFrame {
      * @param song the song currently playing
      * @param secondsPlayed the progression of the current song playing
      */
-    public void updatePlayer(Song song, long secondsPlayed) {
-        long minutesPlayed = secondsPlayed/60;
-        secondsPlayed -= minutesPlayed*60; // Keep seconds between 0 and 60
-        
-        // If secondsPlayed is below 10, add a 0 before it for formatting purposes
-        String time = minutesPlayed + ":";
-        if(secondsPlayed < 10) time += "0" + secondsPlayed;
-        else time += secondsPlayed;
-        
-    	currentSong.setText(song.getTitle() + "\n" + song.getAlbum() + " by " + song.getArtist() + "\n" + time);
+    public void updatePlayer(Song song) {
+    	currentSong.setText(song.getTitle() + "\n" + song.getAlbum() + " by " + song.getArtist());
         songInfoPanel.updateUI();
     }
     
@@ -661,6 +657,9 @@ public class View extends JFrame {
                     // Play random song
                     String path = songTable.getValueAt(songRow, 6).toString();
                     controller.play(path, songRow);
+                    
+                    secondsPlayed.setVisible(true);
+                    secondsRemaining.setVisible(true);
                 } else {
                     controller.shufflePlayOrder();
                 }
@@ -720,6 +719,9 @@ public class View extends JFrame {
                 menuSong.addActionListener(new recentlyPlayedSongListener());
                 showRecentlyPlayed.add(menuSong);
             }
+            
+            secondsPlayed.setVisible(true);
+            secondsRemaining.setVisible(true);
         }
     }
     
@@ -730,6 +732,11 @@ public class View extends JFrame {
     	@Override
         public void actionPerformed(ActionEvent e) {
             controller.stop();
+            secondsPlayed.setText("0:00:00");
+            secondsRemaining.setText("0:00:00");
+            secondsPlayed.setVisible(false);
+            secondsRemaining.setVisible(false);
+            progressBar.setValue(0);
     	}
     }
     
@@ -1047,6 +1054,65 @@ public class View extends JFrame {
         }
     }
     
+    public void updateProgressBar(long msPlayed, long total_ms) {
+        secondsPlayed.setVisible(true);
+        secondsRemaining.setVisible(true);
+        
+        progressBar.setMinimum(0);
+        progressBar.setMaximum((int)total_ms);
+        progressBar.setValue((int)msPlayed);
+        
+        int sPlayed = (int)(msPlayed/1000000);
+        int mPlayed = (int)(msPlayed/60000000);
+        
+        long msLeft = total_ms - msPlayed;
+        
+        int sLeft = (int)(msLeft/1000000);
+        int mLeft = (int)(msLeft/60000000);
+        
+        String secondsP = "";
+        if(sPlayed == 0) secondsP = "00";
+        else if ((sPlayed%60) < 10) secondsP = "0" + (sPlayed%60);
+        else secondsP = "" + (sPlayed%60);
+        
+        String minutesP;
+        if(mPlayed == 0) minutesP = "00";
+        else if ((mPlayed%60) < 10) minutesP = "0" + (mPlayed%60);
+        else minutesP = "" + (mPlayed%60);
+        
+        String secondsL;
+        if(sLeft == 0) secondsL = "00";
+        else if ((sLeft%60) < 10) secondsL = "0" + (sLeft%60);
+        else secondsL = "" + (sLeft%60);
+        
+        String minutesL;
+        if(mLeft == 0) minutesL = "00";
+        else if ((mLeft%60) < 10) minutesL = "0" + (mLeft%60);
+        else minutesL = "" + (mLeft%60);
+        
+        secondsPlayed.setText("0:" + minutesP + ":" + secondsP);
+        secondsRemaining.setText("0:" + minutesL + ":" + secondsL);
+        bottomPanel.repaint();
+    }
+    
+    class increaseVolumeOptionListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            double volume = controller.getGain();
+            volume *= 1.05;
+            controller.changeVolume(volume);
+        }
+    }
+    
+    class decreaseVolumeOptionListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            double volume = controller.getGain();
+            volume *= 0.95;
+            controller.changeVolume(volume);
+        }
+    }
+    
     public final void setupFileChooser() {
         fileChooser = new JFileChooser();
         fileChooser.setFileFilter(new FileNameExtensionFilter("MP3 Files", "mp3"));
@@ -1069,6 +1135,7 @@ public class View extends JFrame {
         songTable = new JTable(tableModel);
         songTable.addMouseListener(new songTablePopupMenuListener());
         songTable.setAutoCreateRowSorter(true); // Enable sorting by table headers
+        songTable.getRowSorter().toggleSortOrder(0);
         
         // Add drag and drop functionality to song table
         songTable.setDragEnabled(true);
@@ -1145,6 +1212,8 @@ public class View extends JFrame {
         nextSong.addActionListener(new nextSongButtonListener());
         previousSong.addActionListener(new previousSongButtonListener());
         goToCurrentSong.addActionListener(new goToCurrentSongListener());
+        increaseVolume.addActionListener(new increaseVolumeOptionListener());
+        decreaseVolume.addActionListener(new decreaseVolumeOptionListener());
         shuffleOption.addActionListener(new shuffleOptionListener());
         repeatSongOption.addActionListener(new repeatSongOptionListener());
         repeatPlaylistOption.addActionListener(new repeatPlaylistOptionListener());
@@ -1279,9 +1348,21 @@ public class View extends JFrame {
         songInfoPanel.add(currentSong);
         currentSong.setBackground(songInfoPanel.getBackground());
         
+        progressBar = new JProgressBar();
+        progressBar.setValue(0);
+        
+        secondsPlayed = new JTextField("0:00:00");
+        secondsRemaining = new JTextField("0:00:00");
+        
+        secondsPlayed.setVisible(false);
+        secondsRemaining.setVisible(false);
+        
         // Add current song playing area and player controls to bottom of gui
         bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.add(songInfoPanel, BorderLayout.NORTH);
+        bottomPanel.add(progressBar, BorderLayout.CENTER);
+        bottomPanel.add(secondsPlayed, BorderLayout.WEST);
+        bottomPanel.add(secondsRemaining, BorderLayout.EAST);
         bottomPanel.add(controlPanel, BorderLayout.SOUTH);
     }
     

@@ -58,7 +58,15 @@ public class Controller implements BasicPlayerListener {
     }
     
     public ArrayList<String> getRecentlyPlayed() {
-        return database.returnRecentlyPlayedSongs();
+        recentlyPlayed = database.returnRecentlyPlayedSongs();
+        ArrayList<String> temp = new ArrayList<>();
+        if(recentlyPlayed.size() > 10) {
+            for(int i = 0; i < 10; i++) {
+                temp.add(recentlyPlayed.get(i));
+            }
+            return temp;
+        } else
+            return recentlyPlayed;
     }
     
     public void addToRecentlyPlayed(String songName) {
@@ -161,7 +169,7 @@ public class Controller implements BasicPlayerListener {
             */
             if(songPath.equals(songPlaying)) {
                 for(View view : BetterThaniTunes.getAllViews())
-                    view.updatePlayer(songs.get(songPlaying), secondsPlayed);
+                    view.updatePlayer(songs.get(songPlaying));
             }
             return true;
         }
@@ -287,7 +295,7 @@ public class Controller implements BasicPlayerListener {
 
             // Updates area of all windows that display the currently playing song
             for(View view : BetterThaniTunes.getAllViews())
-                view.updatePlayer(new Song(songPlaying), this.secondsPlayed);
+                view.updatePlayer(new Song(songPlaying));
         } catch(BasicPlayerException e) {
             e.printStackTrace();
         }
@@ -444,7 +452,7 @@ public class Controller implements BasicPlayerListener {
                     
                     // Update song area of all windows to display song info of new song
                     for(View view : BetterThaniTunes.getAllViews())
-                        view.updatePlayer(new Song(songPlaying), secondsPlayed);
+                        view.updatePlayer(new Song(songPlaying));
                 } catch(BasicPlayerException e) {
                     e.printStackTrace();
                 }
@@ -546,15 +554,20 @@ public class Controller implements BasicPlayerListener {
     @Override
     public void progress(int bytesread, long ms, byte[] pcmdata, Map properties) {
         // Number of seconds is in microseconds, so convert it into seconds
-        long secondsPlayed = ((long)properties.get("mp3.position.microseconds")/1000000);
+        long secondsPlayed = (long)properties.get("mp3.position.microseconds");
+        long songLength = songs.get(songPlaying).getDuration();
+        for(View view : BetterThaniTunes.getAllViews()) {
+            view.updateProgressBar(secondsPlayed, songLength);
+        }
+        
         
         /* If the seconds displayed isn't up to date, refresh
            all views to display correct song progression */
-        if(secondsPlayed != this.secondsPlayed) {
+        /*if(secondsPlayed != this.secondsPlayed) {
             this.secondsPlayed = secondsPlayed;
             for(View view : BetterThaniTunes.getAllViews())
                 view.updatePlayer(new Song(songPlaying), secondsPlayed);
-        }
+        }*/
     }
     
     @Override

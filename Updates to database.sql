@@ -40,3 +40,8 @@ CREATE TABLE RecentlyPlayed (
     CONSTRAINT pk_RecentlyPlayed PRIMARY KEY (songName, songOrder));
 
 delete from RecentlyPlayed;
+drop table RecentlyPlayed;
+CREATE TABLE RecentlyPlayed (
+    songName    VARCHAR(200)    NOT NULL,
+    songOrder   INTEGER         NOT NULL GENERATED ALWAYS AS IDENTITY (START WITH 0, INCREMENT BY 1),
+    CONSTRAINT pk_RecentlyPlayed PRIMARY KEY (songName, songOrder));

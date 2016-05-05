@@ -385,6 +385,7 @@ public class DatabaseModel {
         return columnVisibilities;
     }
     
+    /*
     public ArrayList<String> returnRecentlyPlayedSongs() {
         ArrayList<String> songs = new ArrayList<>();
         String songQuery = "SELECT songName FROM RecentlyPlayed ORDER BY songOrder DESC";
@@ -406,6 +407,24 @@ public class DatabaseModel {
             ArrayList<String> validSongs = new ArrayList<String>(temp);
             return validSongs;
         } else return songs;
+    }*/
+    
+    public ArrayList<String> returnRecentlyPlayedSongs() {
+        ArrayList<String> songs = new ArrayList<>();
+        String songQuery = "SELECT songName FROM RecentlyPlayed ORDER BY songOrder DESC";
+        ResultSet recentlyPlayed = executeQuery(songQuery, new Object[]{});
+        if(recentlyPlayed != null) {
+            try {
+                int counter = 0;
+                while(recentlyPlayed.next()) {
+                    songs.add(counter, recentlyPlayed.getString(1));
+                    counter++;
+                }
+            } catch(SQLException e) {
+                e.printStackTrace();
+            }
+        }
+        return songs;
     }
     
     public int getRecentlyPlayedSize() {
@@ -424,8 +443,10 @@ public class DatabaseModel {
     }
     
     public boolean addToRecentlyPlayed(String songName, int order) {
-        String query = "INSERT INTO RecentlyPlayed (songName, songOrder) VALUES (?,?)";
-        return executeUpdate(query, new Object[]{songName,order});
+        //String query = "INSERT INTO RecentlyPlayed (songName, songOrder) VALUES (?,?)";
+        //return executeUpdate(query, new Object[]{songName,order});
+        String query = "INSERT INTO RecentlyPlayed (songName) VALUES (?)";
+        return executeUpdate(query, new Object[]{songName});
     }
     
     public boolean deleteFromRecentlyPlayed(int order) {
