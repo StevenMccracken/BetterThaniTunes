@@ -1,5 +1,6 @@
 package betterthanitunes;
 
+import com.sun.glass.events.KeyEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -8,6 +9,8 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.Toolkit;
 import java.awt.datatransfer.DataFlavor;
 import static java.awt.datatransfer.DataFlavor.stringFlavor;
 import java.awt.datatransfer.Transferable;
@@ -40,6 +43,7 @@ import javax.swing.JSlider;
 import javax.swing.JTable;
 import javax.swing.JTextPane;
 import javax.swing.JTree;
+import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
@@ -74,7 +78,8 @@ public class View extends JFrame {
     private DefaultTableModel tableModel;
     private DefaultTreeModel treeModel;
     private JButton play, stop, pause_resume, next, previous;
-    private JCheckBox repeatPlaylist, repeatSong, shuffleOption;
+    private JMenu showRecentlyPlayed;
+    private JCheckBoxMenuItem shuffleOption, repeatSongOption, repeatPlaylistOption;
     private JSlider volumeSlider;
     private JMenuBar menuBar;
     private JPopupMenu songTablePopupMenu, sidePanelPopupMenu, tableHeaderPopupMenu;
@@ -182,19 +187,23 @@ public class View extends JFrame {
     }
     
     /**
-     * Method updates the selection of the repeatSong button
-     * @param repeat the value determining if the button is selected or unselected
+     * Method updates the selection of the Repeat Song menu item in the Controls menu
+     * @param repeat the value determining if the menu item is checked or unchecked
      */
-    public void updateRepeatSongButton(boolean repeat) {
-        repeatSong.setSelected(repeat);
+    public void updateRepeatSongOption(boolean repeat) {
+        repeatSongOption.setSelected(repeat);
     }
     
     /**
      * Method updates the selection of the repeatPlaylist button
      * @param repeat the value determining if the button is selected or unselected
      */
-    public void updateRepeatPlaylistButton(boolean repeat) {
-        repeatPlaylist.setSelected(repeat);
+    public void updateRepeatPlaylistOption(boolean repeat) {
+        repeatPlaylistOption.setSelected(repeat);
+    }
+    
+    public void updateShuffleOption(boolean shuffled) {
+        shuffleOption.setSelected(shuffled);
     }
     
     /**
@@ -617,25 +626,24 @@ public class View extends JFrame {
     /**
      * Class defines behavior for when user checks or un-checks repeatPlaylist box.
      */
-    class repeatPlaylistButtonListener implements ActionListener {
+    class repeatPlaylistOptionListener implements ActionListener {
     	@Override
         public void actionPerformed(ActionEvent e) {
-            controller.updateRepeatPlaylistStatus(repeatPlaylist.isSelected());
+            controller.updateRepeatPlaylistStatus(repeatPlaylistOption.isSelected());
     	}
     }
     
     /**
      * Class defines behavior for when user checks or un-checks repeatSong box.
      */
-    class repeatSongButtonListener implements ActionListener {
+    class repeatSongOptionListener implements ActionListener {
     	@Override
         public void actionPerformed(ActionEvent e) {
-            controller.updateRepeatSongStatus(repeatSong.isSelected());
+            controller.updateRepeatSongStatus(repeatSongOption.isSelected());
     	}
     }
     
     class shuffleOptionListener implements ActionListener {
-        int songPlaying = -1;
         @Override
         public void actionPerformed(ActionEvent e) {
             if(shuffleOption.isSelected()) { // Shuffle
@@ -654,10 +662,10 @@ public class View extends JFrame {
                     String path = songTable.getValueAt(songRow, 6).toString();
                     controller.play(path, songRow);
                 } else {
-                    System.out.println("hey");
                     controller.shufflePlayOrder();
                 }
                 controller.updateRepeatPlaylistStatus(true);
+                controller.updateShuffleStatus(true);
             }
             else { // Unshuffle    
                 ArrayList<String> songPaths = new ArrayList<>();
@@ -666,7 +674,7 @@ public class View extends JFrame {
                 
                 controller.updatePlayOrder(songPaths);
                 controller.updateRepeatPlaylistStatus(false);
-                
+                controller.updateShuffleStatus(false);
             }
         }
     }
@@ -701,6 +709,17 @@ public class View extends JFrame {
                 String path = songTable.getValueAt(songTable.getSelectedRow(), 6).toString();
                 controller.play(path, songTable.getSelectedRow());
             }
+            
+            controller.addToRecentlyPlayed(controller.getCurrentSongName());
+            
+            showRecentlyPlayed.removeAll();
+            
+            ArrayList<String> recentlyPlayed = controller.getRecentlyPlayed();
+            for(String songName : recentlyPlayed) {
+                JMenuItem menuSong = new JMenuItem(songName);
+                menuSong.addActionListener(new recentlyPlayedSongListener());
+                showRecentlyPlayed.add(menuSong);
+            }
         }
     }
     
@@ -730,7 +749,20 @@ public class View extends JFrame {
     class nextSongButtonListener implements ActionListener {
     	@Override
         public void actionPerformed(ActionEvent e) {
-            controller.nextSong();
+            if(controller.isPlayerActive()) {
+                controller.nextSong();
+                
+                controller.addToRecentlyPlayed(controller.getCurrentSongName());
+            
+                showRecentlyPlayed.removeAll();
+
+                ArrayList<String> recentlyPlayed = controller.getRecentlyPlayed();
+                for(String songName : recentlyPlayed) {
+                    JMenuItem menuSong = new JMenuItem(songName);
+                    menuSong.addActionListener(new recentlyPlayedSongListener());
+                    showRecentlyPlayed.add(menuSong);
+                }
+            }
     	}
     }
     
@@ -740,7 +772,20 @@ public class View extends JFrame {
     class previousSongButtonListener implements ActionListener {
     	@Override
         public void actionPerformed(ActionEvent e) {
-            controller.previousSong();
+            if(controller.isPlayerActive()) {
+                controller.previousSong();
+                
+                controller.addToRecentlyPlayed(controller.getCurrentSongName());
+            
+                showRecentlyPlayed.removeAll();
+
+                ArrayList<String> recentlyPlayed = controller.getRecentlyPlayed();
+                for(String songName : recentlyPlayed) {
+                    JMenuItem menuSong = new JMenuItem(songName);
+                    menuSong.addActionListener(new recentlyPlayedSongListener());
+                    showRecentlyPlayed.add(menuSong);
+                }
+            }
     	}
     }
     
@@ -951,6 +996,57 @@ public class View extends JFrame {
         }
     }
     
+    class goToCurrentSongListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            String currentSong = controller.getCurrentSong();
+            if(currentSong.length() > 0) {
+                for(int row = 0; row < songTable.getRowCount(); row++) {
+                    if(songTable.getValueAt(row, 6).toString().equals(currentSong)) {
+                        songTable.getSelectionModel().setSelectionInterval(row, row);
+                        songTable.scrollRectToVisible(new Rectangle(songTable.getCellRect(row, 0, true)));
+                        break;
+                    }
+                }
+            } else {
+                int selectedRow = songTable.getSelectedRow();
+                if(selectedRow != -1)
+                    songTable.scrollRectToVisible(new Rectangle(songTable.getCellRect(selectedRow, 0, true)));
+            }
+        }
+    }
+    
+    class recentlyPlayedSongListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            String songName = ((JMenuItem)(e.getSource())).getText();
+            System.out.println(songName);
+            
+            int songRow = -1;
+            String songPath = "";
+            for(int row = 0; row < songTable.getRowCount(); row++) {
+                if(songTable.getValueAt(row, 0).toString().equals(songName)) {
+                    songRow = row;
+                    songPath = songTable.getValueAt(row, 6).toString();
+                    break;
+                }
+            }
+            
+            controller.play(songPath, songRow);
+            
+            controller.addToRecentlyPlayed(controller.getCurrentSongName());
+            
+            showRecentlyPlayed.removeAll();
+            
+            ArrayList<String> recentlyPlayed = controller.getRecentlyPlayed();
+            for(String song : recentlyPlayed) {
+                JMenuItem menuSong = new JMenuItem(song);
+                menuSong.addActionListener(new recentlyPlayedSongListener());
+                showRecentlyPlayed.add(menuSong);
+            }
+        }
+    }
+    
     public final void setupFileChooser() {
         fileChooser = new JFileChooser();
         fileChooser.setFileFilter(new FileNameExtensionFilter("MP3 Files", "mp3"));
@@ -962,7 +1058,12 @@ public class View extends JFrame {
         currentPlaylist = playlist;
         songData = controller.returnAllSongs(currentPlaylist);
         
-        tableModel = new DefaultTableModel(songData, tableHeaders);
+        tableModel = new DefaultTableModel(songData, tableHeaders) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
         //tableModel.addTableModelListener(new tableModelListener());
         
         songTable = new JTable(tableModel);
@@ -991,6 +1092,7 @@ public class View extends JFrame {
     public final void setupMenuBar() {
         menuBar = new JMenuBar();
         JMenu fileMenu = new JMenu("File");
+        JMenu controlMenu = new JMenu("Controls");
         
         JMenuItem addSongMenuItem = new JMenuItem("Add songs");
         JMenuItem deleteSongMenuItem = new JMenuItem("Delete selected songs");
@@ -999,12 +1101,53 @@ public class View extends JFrame {
         JMenuItem deletePlaylist = new JMenuItem("Delete selected playlist");
         JMenuItem quitApplicationMenuItem = new JMenuItem("Quit application");
         
+        JMenuItem playSong = new JMenuItem("Play");
+        JMenuItem nextSong = new JMenuItem("Next");
+        JMenuItem previousSong = new JMenuItem("Previous");
+        
+        showRecentlyPlayed = new JMenu("Play Recent");
+        ArrayList<String> recentlyPlayed = controller.getRecentlyPlayed();
+        for(String song : recentlyPlayed) {
+            JMenuItem menuSong = new JMenuItem(song);
+            menuSong.addActionListener(new recentlyPlayedSongListener());
+            showRecentlyPlayed.add(menuSong);
+        }
+        
+        JMenuItem goToCurrentSong = new JMenuItem("Go to Current Song");
+        JMenuItem increaseVolume = new JMenuItem("Increase Volume");
+        JMenuItem decreaseVolume = new JMenuItem("Decrease Volume");
+        shuffleOption = new JCheckBoxMenuItem("Shuffle", false);
+        repeatSongOption = new JCheckBoxMenuItem("Repeat song", false);
+        repeatPlaylistOption = new JCheckBoxMenuItem("Repeat playlist", false);
+
+        KeyStroke keyStroke_play = KeyStroke.getKeyStroke(' ');
+        KeyStroke keyStroke_next = KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        KeyStroke keyStroke_previous = KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        KeyStroke keyStroke_currentSong = KeyStroke.getKeyStroke('L', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        KeyStroke keyStroke_increaseVol = KeyStroke.getKeyStroke('I', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        KeyStroke keyStroke_decreaseVol = KeyStroke.getKeyStroke('D', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        
+        playSong.setAccelerator(keyStroke_play);
+        nextSong.setAccelerator(keyStroke_next);
+        previousSong.setAccelerator(keyStroke_previous);
+        goToCurrentSong.setAccelerator(keyStroke_currentSong);
+        increaseVolume.setAccelerator(keyStroke_increaseVol);
+        decreaseVolume.setAccelerator(keyStroke_decreaseVol);
+        
         addSongMenuItem.addActionListener(new addSongListener());
         deleteSongMenuItem.addActionListener(new deleteSongListener());
         playExternalSongMenuItem.addActionListener(new playExternalSongListener());
         createPlaylist.addActionListener(new createPlaylistListener());
         deletePlaylist.addActionListener(new deletePlaylistListener());
         quitApplicationMenuItem.addActionListener(new quitButtonListener());
+        
+        playSong.addActionListener(new playButtonListener());
+        nextSong.addActionListener(new nextSongButtonListener());
+        previousSong.addActionListener(new previousSongButtonListener());
+        goToCurrentSong.addActionListener(new goToCurrentSongListener());
+        shuffleOption.addActionListener(new shuffleOptionListener());
+        repeatSongOption.addActionListener(new repeatSongOptionListener());
+        repeatPlaylistOption.addActionListener(new repeatPlaylistOptionListener());
 
         fileMenu.add(addSongMenuItem);
         fileMenu.add(deleteSongMenuItem);
@@ -1014,7 +1157,23 @@ public class View extends JFrame {
         fileMenu.add(deletePlaylist);
         fileMenu.add(new JSeparator());
         fileMenu.add(quitApplicationMenuItem);
+        
+        controlMenu.add(playSong);
+        controlMenu.add(nextSong);
+        controlMenu.add(previousSong);
+        controlMenu.add(showRecentlyPlayed);
+        controlMenu.add(goToCurrentSong);
+        controlMenu.add(new JSeparator());
+        controlMenu.add(increaseVolume);
+        controlMenu.add(decreaseVolume);
+        controlMenu.add(new JSeparator());
+        controlMenu.add(shuffleOption);
+        controlMenu.add(repeatSongOption);
+        controlMenu.add(repeatPlaylistOption);
+        
         menuBar.add(fileMenu);
+        menuBar.add(controlMenu);
+        
     }
     
     public final void setupPopupMenus() {
@@ -1085,9 +1244,6 @@ public class View extends JFrame {
         stop = new JButton("Stop");
         previous = new JButton("Previous song");
         next = new JButton("Next song");
-        repeatPlaylist = new JCheckBox("Repeat Playlist");
-        repeatSong = new JCheckBox("Repeat Song");
-        shuffleOption = new JCheckBox("Shuffle");
         volumeSlider = new JSlider(JSlider.HORIZONTAL, 0, 100, (int)(controller.getGain()*100));
         
         // Add actions to control buttons
@@ -1096,9 +1252,6 @@ public class View extends JFrame {
         pause_resume.addActionListener(new pause_resumeButtonListener());
         next.addActionListener(new nextSongButtonListener());
         previous.addActionListener(new previousSongButtonListener());
-        repeatPlaylist.addActionListener(new repeatPlaylistButtonListener());
-        repeatSong.addActionListener(new repeatSongButtonListener());
-        shuffleOption.addActionListener(new shuffleOptionListener());
         volumeSlider.addChangeListener(new volumeSliderListener());
     }
     
@@ -1109,9 +1262,6 @@ public class View extends JFrame {
         controlPanel.add(stop);
         controlPanel.add(previous);
         controlPanel.add(next);
-        controlPanel.add(repeatSong);
-        controlPanel.add(repeatPlaylist);
-        controlPanel.add(shuffleOption);
         controlPanel.add(volumeSlider);
     }
     

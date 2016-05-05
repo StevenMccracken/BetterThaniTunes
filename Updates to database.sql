@@ -33,3 +33,10 @@ ALTER TABLE Columns ADD CONSTRAINT Playlists_Columns_FK
     FOREIGN KEY (playlistName) REFERENCES Playlists (playlistName);
 
 INSERT INTO playlists VALUES ('Library');
+
+CREATE TABLE RecentlyPlayed (
+    songName    VARCHAR(200)    NOT NULL,
+    songOrder   INTEGER         NOT NULL,
+    CONSTRAINT pk_RecentlyPlayed PRIMARY KEY (songName, songOrder));
+
+delete from RecentlyPlayed;

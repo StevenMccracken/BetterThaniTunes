@@ -32,6 +32,7 @@ public class Controller implements BasicPlayerListener {
     private HashMap<String, Song> songs = new HashMap<>();
     private ArrayList<String> playOrder = new ArrayList<>();
     public static ArrayList<String> genres = new ArrayList<>();
+    private ArrayList<String> recentlyPlayed = new ArrayList<>();
 	
     public Controller() {
     	player.addBasicPlayerListener(this);
@@ -52,6 +53,27 @@ public class Controller implements BasicPlayerListener {
         Object[][] songData = returnAllSongs("Library");
         for(int i = 0; i < songData.length; i++)
             songs.put(songData[i][6].toString(), new Song(songData[i][6].toString()));
+        
+        recentlyPlayed = database.returnRecentlyPlayedSongs();
+    }
+    
+    public ArrayList<String> getRecentlyPlayed() {
+        return database.returnRecentlyPlayedSongs();
+    }
+    
+    public void addToRecentlyPlayed(String songName) {
+        int size = database.getRecentlyPlayedSize();
+        database.addToRecentlyPlayed(songName, size);
+        
+    }
+    
+    public String getCurrentSong() {
+        return songPlaying;
+    }
+    
+    public String getCurrentSongName() {
+        if(songPlaying.length() == 0) return "";
+        return (songs.get(songPlaying).getTitle());
     }
     
     /**
@@ -235,6 +257,11 @@ public class Controller implements BasicPlayerListener {
      */
     public void shufflePlayOrder() {
         Collections.shuffle(playOrder);
+    }
+    
+    public void updateShuffleStatus(boolean shuffled) {
+        for(View view : BetterThaniTunes.getAllViews())
+            view.updateShuffleOption(shuffled);
     }
     
     /**
@@ -480,7 +507,7 @@ public class Controller implements BasicPlayerListener {
     public void updateRepeatPlaylistStatus(boolean repeatPlaylist) {
         this.repeatPlaylist = repeatPlaylist;
         for(View view : BetterThaniTunes.getAllViews())
-            view.updateRepeatPlaylistButton(repeatPlaylist);
+            view.updateRepeatPlaylistOption(repeatPlaylist);
     }
     
     /**
@@ -490,7 +517,7 @@ public class Controller implements BasicPlayerListener {
     public void updateRepeatSongStatus(boolean repeatSong) {
     	this.repeatSong = repeatSong;
         for(View view : BetterThaniTunes.getAllViews())
-            view.updateRepeatSongButton(repeatSong);
+            view.updateRepeatSongOption(repeatSong);
     }
     
     @Override

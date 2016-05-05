@@ -6,6 +6,8 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Class represents the database that holds all songs in a user's library,
@@ -381,6 +383,54 @@ public class DatabaseModel {
             }
         }
         return columnVisibilities;
+    }
+    
+    public ArrayList<String> returnRecentlyPlayedSongs() {
+        ArrayList<String> songs = new ArrayList<>();
+        String songQuery = "SELECT songName FROM RecentlyPlayed ORDER BY songOrder DESC";
+        ResultSet recentlyPlayed = executeQuery(songQuery, new Object[]{});
+        if(recentlyPlayed != null) {
+            try {
+                int counter = 0;
+                while(recentlyPlayed.next()) {
+                    songs.add(counter, recentlyPlayed.getString(1));
+                    counter++;
+                }
+            } catch(SQLException e) {
+                e.printStackTrace();
+            }
+        }
+        
+        if(songs.size() > 10) {
+            List<String> temp = songs.subList(songs.size()-10,songs.size());
+            ArrayList<String> validSongs = new ArrayList<String>(temp);
+            return validSongs;
+        } else return songs;
+    }
+    
+    public int getRecentlyPlayedSize() {
+        int size = 0;
+        String query = "SELECT COUNT(*) FROM RecentlyPlayed";
+        ResultSet results = executeQuery(query, new Object[]{});
+        if(results != null) {
+            try {
+                while(results.next())
+                    size = results.getInt(1);
+            } catch(SQLException e) {
+                e.printStackTrace();
+            }
+        }
+        return size;
+    }
+    
+    public boolean addToRecentlyPlayed(String songName, int order) {
+        String query = "INSERT INTO RecentlyPlayed (songName, songOrder) VALUES (?,?)";
+        return executeUpdate(query, new Object[]{songName,order});
+    }
+    
+    public boolean deleteFromRecentlyPlayed(int order) {
+        String query = "DELETE FROM RecentlyPlayed WHERE songOrder = ?";
+        return executeUpdate(query, new Object[] {order});
     }
     
     /**
