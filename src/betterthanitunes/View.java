@@ -20,6 +20,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.Random;
+import javax.swing.AbstractAction;
+import javax.swing.Action;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JCheckBoxMenuItem;
@@ -71,7 +74,7 @@ public class View extends JFrame {
     private DefaultTableModel tableModel;
     private DefaultTreeModel treeModel;
     private JButton play, stop, pause_resume, next, previous;
-    private JCheckBox repeatPlaylist, repeatSong;
+    private JCheckBox repeatPlaylist, repeatSong, shuffleOption;
     private JSlider volumeSlider;
     private JMenuBar menuBar;
     private JPopupMenu songTablePopupMenu, sidePanelPopupMenu, tableHeaderPopupMenu;
@@ -631,21 +634,70 @@ public class View extends JFrame {
     	}
     }
     
+    class shuffleOptionListener implements ActionListener {
+        int songPlaying = -1;
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if(shuffleOption.isSelected()) { // Shuffle
+                if(!controller.isPlayerActive()) {
+                    Random rand = new Random();
+                    int songRow = rand.nextInt(songTable.getRowCount());
+                    
+                    // Add all songs in the current playlist to the play order
+                    ArrayList<String> songPaths = new ArrayList<>();
+                    for(int i = 0; i < songTable.getRowCount(); i++)
+                        songPaths.add(songTable.getValueAt(i, 6).toString());
+                    controller.updatePlayOrder(songPaths);
+                    controller.shufflePlayOrder();
+
+                    // Play random song
+                    String path = songTable.getValueAt(songRow, 6).toString();
+                    controller.play(path, songRow);
+                } else {
+                    System.out.println("hey");
+                    controller.shufflePlayOrder();
+                }
+                controller.updateRepeatPlaylistStatus(true);
+            }
+            else { // Unshuffle    
+                ArrayList<String> songPaths = new ArrayList<>();
+                for(int i = 0; i < songTable.getRowCount(); i++)
+                    songPaths.add(songTable.getValueAt(i, 6).toString());
+                
+                controller.updatePlayOrder(songPaths);
+                controller.updateRepeatPlaylistStatus(false);
+                
+            }
+        }
+    }
+    
     /**
      * Class defines behavior for when user presses the play button.
      */
     class playButtonListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
-            //If user has selected a row...
-            if(songTable.getSelectedRow() != -1) {
-                // Add all songs in the current playlist to the play order
-                ArrayList<String> songPaths = new ArrayList<>();
-                for(int i = 0; i < songTable.getRowCount(); i++)
-                    songPaths.add(songTable.getValueAt(i, 6).toString());
-                controller.updatePlayOrder(songPaths);
-                
-                // Play selected song
+            // Add all songs in the current playlist to the play order
+            ArrayList<String> songPaths = new ArrayList<>();
+            for(int i = 0; i < songTable.getRowCount(); i++)
+                songPaths.add(songTable.getValueAt(i, 6).toString());
+            controller.updatePlayOrder(songPaths);
+            
+            // If user hasn't selected a row yet
+            if(songTable.getSelectedRow() == -1) {
+                // If shuffle is checked
+                if(shuffleOption.isSelected()) {
+                    // Play a random song
+                    Random rand = new Random();
+                    int randomSongRow = rand.nextInt(songTable.getRowCount());
+                    
+                    String path = songTable.getValueAt(randomSongRow, 6).toString();
+                    controller.play(path, randomSongRow);
+                } else { // Else, play the first song
+                    String path = songTable.getValueAt(0, 6).toString();
+                    controller.play(path, 0);
+                }
+            } else { // Else play the selected song
                 String path = songTable.getValueAt(songTable.getSelectedRow(), 6).toString();
                 controller.play(path, songTable.getSelectedRow());
             }
@@ -866,6 +918,7 @@ public class View extends JFrame {
     class tableHeaderListener extends MouseAdapter {
         @Override
         public void mousePressed(MouseEvent e) {
+            // If user right clicked the column header, show the column visibility popup menu
             if(SwingUtilities.isRightMouseButton(e))
                 tableHeaderPopupMenu.show(songTable.getTableHeader(), e.getX(), e.getY());
         }
@@ -914,7 +967,7 @@ public class View extends JFrame {
         
         songTable = new JTable(tableModel);
         songTable.addMouseListener(new songTablePopupMenuListener());
-        //songTable.setAutoCreateRowSorter(true); // Enable sorting by table headers
+        songTable.setAutoCreateRowSorter(true); // Enable sorting by table headers
         
         // Add drag and drop functionality to song table
         songTable.setDragEnabled(true);
@@ -1034,6 +1087,7 @@ public class View extends JFrame {
         next = new JButton("Next song");
         repeatPlaylist = new JCheckBox("Repeat Playlist");
         repeatSong = new JCheckBox("Repeat Song");
+        shuffleOption = new JCheckBox("Shuffle");
         volumeSlider = new JSlider(JSlider.HORIZONTAL, 0, 100, (int)(controller.getGain()*100));
         
         // Add actions to control buttons
@@ -1044,6 +1098,7 @@ public class View extends JFrame {
         previous.addActionListener(new previousSongButtonListener());
         repeatPlaylist.addActionListener(new repeatPlaylistButtonListener());
         repeatSong.addActionListener(new repeatSongButtonListener());
+        shuffleOption.addActionListener(new shuffleOptionListener());
         volumeSlider.addChangeListener(new volumeSliderListener());
     }
     
@@ -1056,6 +1111,7 @@ public class View extends JFrame {
         controlPanel.add(next);
         controlPanel.add(repeatSong);
         controlPanel.add(repeatPlaylist);
+        controlPanel.add(shuffleOption);
         controlPanel.add(volumeSlider);
     }
     

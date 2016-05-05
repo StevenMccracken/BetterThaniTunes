@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.Collections;
 import javazoom.jlgui.basicplayer.BasicController;
 import javazoom.jlgui.basicplayer.BasicPlayer;
 import javazoom.jlgui.basicplayer.BasicPlayerEvent;
@@ -219,7 +220,7 @@ public class Controller implements BasicPlayerListener {
     }
     
     /**
-     * Updates the playOrder array list to contain the order of songs as they
+     * Method updates the playOrder array list to contain the order of songs as they
      * appear in a playlist, so they can be iterated over for consecutive playback
      * @param songPaths the paths of the songs
      */
@@ -227,6 +228,13 @@ public class Controller implements BasicPlayerListener {
         playOrder.clear();
         for(String songPath : songPaths)
             playOrder.add(songPath);
+    }
+    
+    /**
+     * Method randomizes the playOrder array list.
+     */
+    public void shufflePlayOrder() {
+        Collections.shuffle(playOrder);
     }
     
     /**
