@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.Collections;
 import javazoom.jlgui.basicplayer.BasicController;
 import javazoom.jlgui.basicplayer.BasicPlayer;
 import javazoom.jlgui.basicplayer.BasicPlayerEvent;
@@ -31,6 +32,7 @@ public class Controller implements BasicPlayerListener {
     private HashMap<String, Song> songs = new HashMap<>();
     private ArrayList<String> playOrder = new ArrayList<>();
     public static ArrayList<String> genres = new ArrayList<>();
+    private ArrayList<String> recentlyPlayed = new ArrayList<>();
 	
     public Controller() {
     	player.addBasicPlayerListener(this);
@@ -51,6 +53,35 @@ public class Controller implements BasicPlayerListener {
         Object[][] songData = returnAllSongs("Library");
         for(int i = 0; i < songData.length; i++)
             songs.put(songData[i][6].toString(), new Song(songData[i][6].toString()));
+        
+        recentlyPlayed = database.returnRecentlyPlayedSongs();
+    }
+    
+    public ArrayList<String> getRecentlyPlayed() {
+        recentlyPlayed = database.returnRecentlyPlayedSongs();
+        ArrayList<String> temp = new ArrayList<>();
+        if(recentlyPlayed.size() > 10) {
+            for(int i = 0; i < 10; i++) {
+                temp.add(recentlyPlayed.get(i));
+            }
+            return temp;
+        } else
+            return recentlyPlayed;
+    }
+    
+    public void addToRecentlyPlayed(String songName) {
+        int size = database.getRecentlyPlayedSize();
+        database.addToRecentlyPlayed(songName, size);
+        
+    }
+    
+    public String getCurrentSong() {
+        return songPlaying;
+    }
+    
+    public String getCurrentSongName() {
+        if(songPlaying.length() == 0) return "";
+        return (songs.get(songPlaying).getTitle());
     }
     
     /**
@@ -138,7 +169,7 @@ public class Controller implements BasicPlayerListener {
             */
             if(songPath.equals(songPlaying)) {
                 for(View view : BetterThaniTunes.getAllViews())
-                    view.updatePlayer(songs.get(songPlaying), secondsPlayed);
+                    view.updatePlayer(songs.get(songPlaying));
             }
             return true;
         }
@@ -199,7 +230,27 @@ public class Controller implements BasicPlayerListener {
     }
     
     /**
-     * Updates the playOrder array list to contain the order of songs as they
+     * Method sets the column visibility for a single column in a playlist
+     * @param playlist the current playlist containing the column
+     * @param column the name of the column
+     * @param visibility whether the column is visible or not
+     * @return true if the column visibility was updated. Otherwise, false
+     */
+    public boolean setColumnVisibility(String playlist, String column, boolean visibility) {
+        return database.updateColumnVisibility(playlist, column, visibility);
+    }
+    
+    /**
+     * Method gets the column visibility for all column in a playlist
+     * @param playlistName the name of the playlist
+     * @return an array of booleans indicating the column visibilities
+     */
+    public boolean[] getColumnVisibility(String playlistName) {
+        return database.returnColumnVisibility(playlistName);
+    }
+    
+    /**
+     * Method updates the playOrder array list to contain the order of songs as they
      * appear in a playlist, so they can be iterated over for consecutive playback
      * @param songPaths the paths of the songs
      */
@@ -207,6 +258,18 @@ public class Controller implements BasicPlayerListener {
         playOrder.clear();
         for(String songPath : songPaths)
             playOrder.add(songPath);
+    }
+    
+    /**
+     * Method randomizes the playOrder array list.
+     */
+    public void shufflePlayOrder() {
+        Collections.shuffle(playOrder);
+    }
+    
+    public void updateShuffleStatus(boolean shuffled) {
+        for(View view : BetterThaniTunes.getAllViews())
+            view.updateShuffleOption(shuffled);
     }
     
     /**
@@ -232,7 +295,7 @@ public class Controller implements BasicPlayerListener {
 
             // Updates area of all windows that display the currently playing song
             for(View view : BetterThaniTunes.getAllViews())
-                view.updatePlayer(new Song(songPlaying), this.secondsPlayed);
+                view.updatePlayer(new Song(songPlaying));
         } catch(BasicPlayerException e) {
             e.printStackTrace();
         }
@@ -389,7 +452,7 @@ public class Controller implements BasicPlayerListener {
                     
                     // Update song area of all windows to display song info of new song
                     for(View view : BetterThaniTunes.getAllViews())
-                        view.updatePlayer(new Song(songPlaying), secondsPlayed);
+                        view.updatePlayer(new Song(songPlaying));
                 } catch(BasicPlayerException e) {
                     e.printStackTrace();
                 }
@@ -452,7 +515,7 @@ public class Controller implements BasicPlayerListener {
     public void updateRepeatPlaylistStatus(boolean repeatPlaylist) {
         this.repeatPlaylist = repeatPlaylist;
         for(View view : BetterThaniTunes.getAllViews())
-            view.updateRepeatPlaylistButton(repeatPlaylist);
+            view.updateRepeatPlaylistOption(repeatPlaylist);
     }
     
     /**
@@ -462,7 +525,7 @@ public class Controller implements BasicPlayerListener {
     public void updateRepeatSongStatus(boolean repeatSong) {
     	this.repeatSong = repeatSong;
         for(View view : BetterThaniTunes.getAllViews())
-            view.updateRepeatSongButton(repeatSong);
+            view.updateRepeatSongOption(repeatSong);
     }
     
     @Override
@@ -491,15 +554,20 @@ public class Controller implements BasicPlayerListener {
     @Override
     public void progress(int bytesread, long ms, byte[] pcmdata, Map properties) {
         // Number of seconds is in microseconds, so convert it into seconds
-        long secondsPlayed = ((long)properties.get("mp3.position.microseconds")/1000000);
+        long secondsPlayed = (long)properties.get("mp3.position.microseconds");
+        long songLength = songs.get(songPlaying).getDuration();
+        for(View view : BetterThaniTunes.getAllViews()) {
+            view.updateProgressBar(secondsPlayed, songLength);
+        }
+        
         
         /* If the seconds displayed isn't up to date, refresh
            all views to display correct song progression */
-        if(secondsPlayed != this.secondsPlayed) {
+        /*if(secondsPlayed != this.secondsPlayed) {
             this.secondsPlayed = secondsPlayed;
             for(View view : BetterThaniTunes.getAllViews())
                 view.updatePlayer(new Song(songPlaying), secondsPlayed);
-        }
+        }*/
     }
     
     @Override
