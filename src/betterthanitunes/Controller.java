@@ -57,31 +57,52 @@ public class Controller implements BasicPlayerListener {
         recentlyPlayed = database.returnRecentlyPlayedSongs();
     }
     
+    /**
+     * Method returns up to the 10 most recent songs played
+     * @return an ArrayList of strings representing song titles
+     */
     public ArrayList<String> getRecentlyPlayed() {
         recentlyPlayed = database.returnRecentlyPlayedSongs();
-        ArrayList<String> temp = new ArrayList<>();
         if(recentlyPlayed.size() > 10) {
-            for(int i = 0; i < 10; i++) {
-                temp.add(recentlyPlayed.get(i));
-            }
-            return temp;
+            ArrayList<String> lastTenSongs = new ArrayList<>();
+            for(int i = 0; i < 10; i++)
+                lastTenSongs.add(recentlyPlayed.get(i));
+            
+            return lastTenSongs;
         } else
             return recentlyPlayed;
     }
     
-    public void addToRecentlyPlayed(String songName) {
-        int size = database.getRecentlyPlayedSize();
-        database.addToRecentlyPlayed(songName, size);
-        
+    /**
+     * Method adds a song to the list of recently played songs
+     * @param songName the name of the song to add
+     * @return true if the song was added to the list. Otherwise, false
+     */
+    public boolean addToRecentlyPlayed(String songName) {
+        return database.addToRecentlyPlayed(songName);
     }
     
+    /**
+     * Method removes all songs from the recently played list.
+     */
+    public void clearRecentlyPlayed() {
+        database.clearRecentlyPlayed();
+    }
+    
+    /**
+     * Method gets the path of the current song playing
+     * @return a string containing the path of the current song
+     */
     public String getCurrentSong() {
         return songPlaying;
     }
     
+    /**
+     * Method gets the title of the current song playings
+     * @return a string containing the title of the current song
+     */
     public String getCurrentSongName() {
-        if(songPlaying.length() == 0) return "";
-        return (songs.get(songPlaying).getTitle());
+        return ((songPlaying.length() == 0) ? "" : songs.get(songPlaying).getTitle());
     }
     
     /**
@@ -90,8 +111,9 @@ public class Controller implements BasicPlayerListener {
      */
     public void changeVolume(double volume) {
         try {
-            if(isPlayerActive()) controller.setGain(volume);
             gain = volume;
+            if(isPlayerActive()) controller.setGain(gain);
+            
             // Update the volume slider of all Views
             for(View view : BetterThaniTunes.getAllViews())
                 view.updateVolumeSlider(gain);
@@ -267,6 +289,10 @@ public class Controller implements BasicPlayerListener {
         Collections.shuffle(playOrder);
     }
     
+    /**
+     * Method updates the Shuffle menu option check/uncheck for all Views
+     * @param shuffled the boolean value of the menu item
+     */
     public void updateShuffleStatus(boolean shuffled) {
         for(View view : BetterThaniTunes.getAllViews())
             view.updateShuffleOption(shuffled);
@@ -554,20 +580,10 @@ public class Controller implements BasicPlayerListener {
     @Override
     public void progress(int bytesread, long ms, byte[] pcmdata, Map properties) {
         // Number of seconds is in microseconds, so convert it into seconds
-        long secondsPlayed = (long)properties.get("mp3.position.microseconds");
+        secondsPlayed = (long)properties.get("mp3.position.microseconds");
         long songLength = songs.get(songPlaying).getDuration();
-        for(View view : BetterThaniTunes.getAllViews()) {
+        for(View view : BetterThaniTunes.getAllViews())
             view.updateProgressBar(secondsPlayed, songLength);
-        }
-        
-        
-        /* If the seconds displayed isn't up to date, refresh
-           all views to display correct song progression */
-        /*if(secondsPlayed != this.secondsPlayed) {
-            this.secondsPlayed = secondsPlayed;
-            for(View view : BetterThaniTunes.getAllViews())
-                view.updatePlayer(new Song(songPlaying), secondsPlayed);
-        }*/
     }
     
     @Override

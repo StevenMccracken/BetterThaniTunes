@@ -6,8 +6,6 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * Class represents the database that holds all songs in a user's library,
@@ -210,7 +208,6 @@ public class DatabaseModel {
      * @return true if the song was deleted. Otherwise, false
      */
     public boolean deleteSong(Song song, String playlistName, int id) {
-        PreparedStatement statement;
         if(playlistName.equals("Library")) {
             ArrayList<String> playlists = new ArrayList<>();
             ResultSet results = executeQuery("SELECT playlistName FROM SongPlaylist WHERE path = ?", new Object[] {song.getPath()});
@@ -385,41 +382,35 @@ public class DatabaseModel {
         return columnVisibilities;
     }
     
-    /*
-    public ArrayList<String> returnRecentlyPlayedSongs() {
-        ArrayList<String> songs = new ArrayList<>();
-        String songQuery = "SELECT songName FROM RecentlyPlayed ORDER BY songOrder DESC";
-        ResultSet recentlyPlayed = executeQuery(songQuery, new Object[]{});
-        if(recentlyPlayed != null) {
-            try {
-                int counter = 0;
-                while(recentlyPlayed.next()) {
-                    songs.add(counter, recentlyPlayed.getString(1));
-                    counter++;
-                }
-            } catch(SQLException e) {
-                e.printStackTrace();
-            }
-        }
-        
-        if(songs.size() > 10) {
-            List<String> temp = songs.subList(songs.size()-10,songs.size());
-            ArrayList<String> validSongs = new ArrayList<String>(temp);
-            return validSongs;
-        } else return songs;
-    }*/
+    /**
+     * Method adds a song to the recently played list
+     * @param songName the name of the song
+     * @return true if the song was inserted. Otherwise, false
+     */
+    public boolean addToRecentlyPlayed(String songName) {
+        String query = "INSERT INTO RecentlyPlayed (songName) VALUES (?)";
+        return executeUpdate(query, new Object[]{songName});
+    }
     
+    /**
+     * Method removes all songs from the recently played list.
+     */
+    public void clearRecentlyPlayed() {
+        executeUpdate("DELETE FROM RecentlyPlayed", new Object[]{});
+    }
+    
+    /**
+     * Method returns all of the songs in the recently played list
+     * @return an ArrayList of strings containing song titles
+     */
     public ArrayList<String> returnRecentlyPlayedSongs() {
         ArrayList<String> songs = new ArrayList<>();
         String songQuery = "SELECT songName FROM RecentlyPlayed ORDER BY songOrder DESC";
         ResultSet recentlyPlayed = executeQuery(songQuery, new Object[]{});
         if(recentlyPlayed != null) {
             try {
-                int counter = 0;
-                while(recentlyPlayed.next()) {
-                    songs.add(counter, recentlyPlayed.getString(1));
-                    counter++;
-                }
+                while(recentlyPlayed.next())
+                    songs.add(recentlyPlayed.getString(1));
             } catch(SQLException e) {
                 e.printStackTrace();
             }
@@ -427,31 +418,23 @@ public class DatabaseModel {
         return songs;
     }
     
+    /**
+     * Method returns the size of the recently played list
+     * @return an int representing the number of songs recently played
+     */
     public int getRecentlyPlayedSize() {
         int size = 0;
         String query = "SELECT COUNT(*) FROM RecentlyPlayed";
         ResultSet results = executeQuery(query, new Object[]{});
         if(results != null) {
             try {
-                while(results.next())
+                if(results.next())
                     size = results.getInt(1);
             } catch(SQLException e) {
                 e.printStackTrace();
             }
         }
         return size;
-    }
-    
-    public boolean addToRecentlyPlayed(String songName, int order) {
-        //String query = "INSERT INTO RecentlyPlayed (songName, songOrder) VALUES (?,?)";
-        //return executeUpdate(query, new Object[]{songName,order});
-        String query = "INSERT INTO RecentlyPlayed (songName) VALUES (?)";
-        return executeUpdate(query, new Object[]{songName});
-    }
-    
-    public boolean deleteFromRecentlyPlayed(int order) {
-        String query = "DELETE FROM RecentlyPlayed WHERE songOrder = ?";
-        return executeUpdate(query, new Object[] {order});
     }
     
     /**
