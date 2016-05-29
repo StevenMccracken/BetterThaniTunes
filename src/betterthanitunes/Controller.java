@@ -308,7 +308,7 @@ public class Controller implements BasicPlayerListener {
         // Updates pause_resume button of all windows to switch text from 'resume' to 'pause'
         if(isPlayerPaused()) {
             for(View view : BetterThaniTunes.getAllViews())
-                view.updatePauseResumeButton("Pause");
+                view.updatePlayPauseButton(false);
         }
         
         try {  
@@ -320,8 +320,10 @@ public class Controller implements BasicPlayerListener {
             this.currentIndex = currentIndex;
 
             // Updates area of all windows that display the currently playing song
-            for(View view : BetterThaniTunes.getAllViews())
+            for(View view : BetterThaniTunes.getAllViews()) {
                 view.updatePlayer(new Song(songPlaying));
+                view.updatePlayPauseButton(false);
+            }
         } catch(BasicPlayerException e) {
             e.printStackTrace();
         }
@@ -333,9 +335,8 @@ public class Controller implements BasicPlayerListener {
      */
     public void pause_resume() {
     	if(isPlayerPlaying()) {
-            // Updates pause_resume button of all windows to switch text from 'pause' to 'resume'
             for(View view : BetterThaniTunes.getAllViews())
-                view.updatePauseResumeButton("Resume");
+                view.updatePlayPauseButton(true);
             try {
                 controller.pause();
             } catch(BasicPlayerException e) {
@@ -343,9 +344,8 @@ public class Controller implements BasicPlayerListener {
             }
     	}
     	else if(isPlayerPaused()) {
-            // Update pause_resume button of all windows to switch text from 'pause' to 'resume'
             for(View view : BetterThaniTunes.getAllViews())
-                view.updatePauseResumeButton("Pause");
+                view.updatePlayPauseButton(false);
             try {
                 controller.resume();
             } catch(BasicPlayerException e) {
@@ -361,10 +361,10 @@ public class Controller implements BasicPlayerListener {
     public void stop() {
         // If player isn't playing a song, do nothing
     	if(isPlayerActive()) {
-            // Update song area & pause/resume button of all windows
+            // Update song area & play/pause button of all windows
             for(View view : BetterThaniTunes.getAllViews()) {
                 view.clearPlayer();
-                view.updatePauseResumeButton("Pause");
+                view.updatePlayPauseButton(true);
             }
             try {
                 // Stop the song
@@ -389,7 +389,7 @@ public class Controller implements BasicPlayerListener {
                 // If the player is paused, update the pause_resume button to display 'pause'
                 if(isPlayerPaused()) {
                     for(View view : BetterThaniTunes.getAllViews())
-                        view.updatePauseResumeButton("Pause");
+                        view.updatePlayPauseButton(false);
                 }
                 try {
                     controller.open(new File(songPlaying));
@@ -429,7 +429,7 @@ public class Controller implements BasicPlayerListener {
             // If the player is paused, update the pause_resume button to display 'pause'
             if(isPlayerPaused()) {
                 for(View view : BetterThaniTunes.getAllViews())
-                    view.updatePauseResumeButton("Pause");
+                    view.updatePlayPauseButton(false);
             }
             try {
                 controller.open(new File(songPlaying));
@@ -469,7 +469,7 @@ public class Controller implements BasicPlayerListener {
                 // If the player is paused, update the pause_resume button of all windows to display 'pause'
                 if(isPlayerPaused()) {
                     for(View view : BetterThaniTunes.getAllViews())
-                        view.updatePauseResumeButton("Pause");
+                        view.updatePlayPauseButton(false);
                 }
                 try {
                     controller.open(new File(songPlaying));

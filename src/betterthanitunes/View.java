@@ -24,6 +24,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Random;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFileChooser;
@@ -76,7 +77,7 @@ public class View extends JFrame {
     private JTree playlistTree;
     private DefaultTableModel tableModel;
     private DefaultTreeModel treeModel;
-    private JButton play, stop, pause_resume, next, previous;
+    private JButton play_pause, pause_resume, stop, next, previous;
     private JMenu showRecentlyPlayed;
     private JCheckBoxMenuItem shuffleOption, repeatSongOption, repeatPlaylistOption;
     private JSlider volumeSlider;
@@ -92,6 +93,10 @@ public class View extends JFrame {
     private Object[][] songData;
     private boolean disableTableModelListener = false;
     private JProgressBar progressBar;
+    private final ImageIcon playButtonIcon = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/play_song_image_small.png");
+    private final ImageIcon pauseButtonIcon = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/pause_song_image_small.png");
+    private final ImageIcon nextButtonIcon = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/next_song_image_small.png");
+    private final ImageIcon previousButtonIcon = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/previous_song_image_small.png");
     
     /**
      * Default constructor creates a BetterThaniTunes
@@ -176,6 +181,18 @@ public class View extends JFrame {
      */
     public void updatePauseResumeButton(String text) {
     	pause_resume.setText(text);
+    }
+    
+    /**
+     * Method updates play/pause button to the corresponding icon
+     * @param paused true if the player is paused. Otherwise, false
+     */
+    public void updatePlayPauseButton(boolean paused) {
+        // If player is paused, set the play/pause button icon to "play"
+        if(paused) play_pause.setIcon(playButtonIcon);
+        // Else, set the play/pause button icon to "pause"
+        else play_pause.setIcon(pauseButtonIcon);
+        controlPanel.repaint();
     }
     
     /**
@@ -754,35 +771,40 @@ public class View extends JFrame {
     class playSongListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
-            // Add all songs in the current playlist to the play order
-            ArrayList<String> songPaths = new ArrayList<>();
-            for(int i = 0; i < songTable.getRowCount(); i++)
-                songPaths.add(songTable.getValueAt(i, 6).toString());
-            controller.updatePlayOrder(songPaths);
-            
-            // If user hasn't selected a row yet
-            if(songTable.getSelectedRow() == -1) {
-                // If shuffle is checked
-                if(shuffleOption.isSelected()) {
-                    // Play a random song
-                    Random rand = new Random();
-                    int randomSongRow = rand.nextInt(songTable.getRowCount());
-                    
-                    String path = songTable.getValueAt(randomSongRow, 6).toString();
-                    controller.play(path, randomSongRow);
-                } else { // Else, play the first song
-                    String path = songTable.getValueAt(0, 6).toString();
-                    controller.play(path, 0);
-                }
-            } else { // Else play the selected song
-                String path = songTable.getValueAt(songTable.getSelectedRow(), 6).toString();
-                controller.play(path, songTable.getSelectedRow());
+            if(controller.isPlayerActive()) {
+                controller.pause_resume();
             }
-            
-            updateRecentlyPlayedMenu();
-            
-            secondsPlayedTimer.setVisible(true);
-            secondsRemainingTimer.setVisible(true);
+            else {
+                // Add all songs in the current playlist to the play order
+                ArrayList<String> songPaths = new ArrayList<>();
+                for(int i = 0; i < songTable.getRowCount(); i++)
+                    songPaths.add(songTable.getValueAt(i, 6).toString());
+                controller.updatePlayOrder(songPaths);
+
+                // If user hasn't selected a row yet
+                if(songTable.getSelectedRow() == -1) {
+                    // If shuffle is checked
+                    if(shuffleOption.isSelected()) {
+                        // Play a random song
+                        Random rand = new Random();
+                        int randomSongRow = rand.nextInt(songTable.getRowCount());
+
+                        String path = songTable.getValueAt(randomSongRow, 6).toString();
+                        controller.play(path, randomSongRow);
+                    } else { // Else, play the first song
+                        String path = songTable.getValueAt(0, 6).toString();
+                        controller.play(path, 0);
+                    }
+                } else { // Else play the selected song
+                    String path = songTable.getValueAt(songTable.getSelectedRow(), 6).toString();
+                    controller.play(path, songTable.getSelectedRow());
+                }
+
+                updateRecentlyPlayedMenu();
+
+                secondsPlayedTimer.setVisible(true);
+                secondsRemainingTimer.setVisible(true);
+            }
         }
     }
     
@@ -1284,6 +1306,13 @@ public class View extends JFrame {
         controlMenu.add(repeatPlaylistOption);
         
         menuBar.add(controlMenu);
+        
+        volumeSlider = new JSlider(JSlider.VERTICAL, 0, 100, (int)(controller.getGain()*100));
+        volumeSlider.addChangeListener(new volumeSliderListener());
+        
+        JMenu volumeMenu = new JMenu("Volume");
+        volumeMenu.add(volumeSlider);
+        menuBar.add(volumeMenu);
     }
     
     public final void setupPopupMenus() {
@@ -1349,32 +1378,30 @@ public class View extends JFrame {
     
     public final void setupButtons() {
         // Instantiate control buttons
-        play = new JButton("Play");
-        pause_resume = new JButton("Pause");
-        stop = new JButton("Stop");
-        previous = new JButton("Previous song");
-        next = new JButton("Next song");
-        volumeSlider = new JSlider(JSlider.HORIZONTAL, 0, 100, (int)(controller.getGain()*100));
+        play_pause = new JButton(playButtonIcon);
+        pause_resume = new JButton();
+        stop = new JButton();
+        previous = new JButton(previousButtonIcon);
+        next = new JButton(nextButtonIcon);
         
         // Add actions to control buttons
-        play.addActionListener(new playSongListener());
+        play_pause.addActionListener(new playSongListener());
         stop.addActionListener(new stopSongListener());
         pause_resume.addActionListener(new pause_resumeSongListener());
         next.addActionListener(new playNextSongListener());
         previous.addActionListener(new playPreviousSongListener());
-        volumeSlider.addChangeListener(new volumeSliderListener());
     }
     
     public final void setupControlPanel() {
+        JPanel unorganizedJPanel = new JPanel();
+        unorganizedJPanel.add(previous);
+        unorganizedJPanel.add(play_pause);
+        unorganizedJPanel.add(next);
+        
         controlPanel = new JPanel();
-        controlPanel.add(play);
-        controlPanel.add(pause_resume);
-        controlPanel.add(stop);
-        controlPanel.add(previous);
-        controlPanel.add(next);
-        controlPanel.add(volumeSlider);
+        controlPanel.setLayout(new BorderLayout());
+        controlPanel.add(unorganizedJPanel, BorderLayout.SOUTH);
     }
-    
     
     public final void setupSongArea() {
         // Set up current song playing area
@@ -1402,12 +1429,16 @@ public class View extends JFrame {
         secondsRemainingTimer.setVisible(false);
         
         // Add current song playing area and player controls to bottom of gui
+        JPanel bottom = new JPanel(new BorderLayout());
+        bottom.add(songInfoPanel, BorderLayout.NORTH);
+        bottom.add(progressBar, BorderLayout.CENTER);
+        bottom.add(secondsPlayedTimer, BorderLayout.WEST);
+        bottom.add(secondsRemainingTimer, BorderLayout.EAST);
+        bottom.add(controlPanel, BorderLayout.SOUTH);
+        
         bottomPanel = new JPanel(new BorderLayout());
-        bottomPanel.add(songInfoPanel, BorderLayout.NORTH);
-        bottomPanel.add(progressBar, BorderLayout.CENTER);
-        bottomPanel.add(secondsPlayedTimer, BorderLayout.WEST);
-        bottomPanel.add(secondsRemainingTimer, BorderLayout.EAST);
-        bottomPanel.add(controlPanel, BorderLayout.SOUTH);
+        bottomPanel.add(controlPanel, BorderLayout.WEST);
+        bottomPanel.add(bottom, BorderLayout.CENTER);
     }
     
     public final void setupFramePanel(boolean playlistWindow) {
@@ -1419,7 +1450,6 @@ public class View extends JFrame {
         framePanel.add(bottomPanel, BorderLayout.SOUTH);
         framePanel.addMouseListener(new songTablePopupMenuListener());
     }
-    
     
     public final void setupGuiWindow() {
         setPreferredSize(new Dimension(initWindowWidth, initWindowHeight));
