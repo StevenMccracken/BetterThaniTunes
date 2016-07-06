@@ -24,6 +24,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Random;
+import javax.swing.Box;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBoxMenuItem;
@@ -93,10 +94,11 @@ public class View extends JFrame {
     private Object[][] songData;
     private boolean disableTableModelListener = false;
     private JProgressBar progressBar;
-    private final ImageIcon playButtonIcon = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/play_song_image_small.png");
-    private final ImageIcon pauseButtonIcon = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/pause_song_image_small.png");
-    private final ImageIcon nextButtonIcon = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/next_song_image_small.png");
-    private final ImageIcon previousButtonIcon = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/previous_song_image_small.png");
+    private final ImageIcon playButtonIcon      = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/play_song_image_small.png");
+    private final ImageIcon pauseButtonIcon     = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/pause_song_image_small.png");
+    private final ImageIcon nextButtonIcon      = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/next_song_image_small.png");
+    private final ImageIcon previousButtonIcon  = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/previous_song_image_small.png");
+    private final ImageIcon volumeButtonIcon    = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/volume_image_small.png");
     
     /**
      * Default constructor creates a BetterThaniTunes
@@ -108,7 +110,7 @@ public class View extends JFrame {
         
         setupFileChooser();
         setupSongTable("Library");
-        setupMenuBar();
+        setupMenuBar(false);
         setupPopupMenus();
         setupSidePanel();
         setupButtons();
@@ -131,7 +133,7 @@ public class View extends JFrame {
         
         setupFileChooser();
         setupSongTable(playlist);
-        setupMenuBar();
+        setupMenuBar(true);
         setupPopupMenus();
         setupButtons();
         setupControlPanel();
@@ -237,10 +239,10 @@ public class View extends JFrame {
         progressBar.setValue((int)microsecondsPlayed);
         
         long microsecondsRemaining = totalMicroseconds - microsecondsPlayed;
-        int secondsPlayed = ((int)(microsecondsPlayed/1000000))%60;
-        int minutesPlayed = ((int)(microsecondsPlayed/60000000))%60;        
-        int secondsLeft = ((int)(microsecondsRemaining/1000000))%60;
-        int minutesLeft = ((int)(microsecondsRemaining/60000000))%60;
+        int secondsPlayed   = ((int)(microsecondsPlayed/1000000))%60;
+        int minutesPlayed   = ((int)(microsecondsPlayed/60000000))%60;        
+        int secondsLeft     = ((int)(microsecondsRemaining/1000000))%60;
+        int minutesLeft     = ((int)(microsecondsRemaining/60000000))%60;
         
         if(minutesPlayed == 0) timePlayedText = "00:";
         else if (minutesPlayed < 10) timePlayedText = "0" + minutesPlayed + ":";
@@ -696,6 +698,16 @@ public class View extends JFrame {
         @Override
         public void actionPerformed(ActionEvent e) {
             quit();
+        }
+    }
+    
+    /**
+     * Class defines behavior for when user selects close playlist window option from the menu bar.
+     */
+    class closeWindowOptionListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            dispose();
         }
     }
     
@@ -1197,23 +1209,23 @@ public class View extends JFrame {
         songTableScrollPane = new JScrollPane(songTable);
     }
     
-    public final void setupMenuBar() {
+    public final void setupMenuBar(boolean playlistWindow) {
         menuBar = new JMenuBar();
         
         // Setup File menu options
         JMenu fileMenu = new JMenu("File");
         
-        JMenuItem addSongMenuItem = new JMenuItem("Add songs");
-        JMenuItem deleteSongMenuItem = new JMenuItem("Delete selected songs");
-        JMenuItem playExternalSongMenuItem = new JMenuItem("Play a song not in the library");
-        JMenuItem createPlaylist = new JMenuItem("Create playlist");
-        JMenuItem deletePlaylist = new JMenuItem("Delete selected playlist");
-        JMenuItem clearRecentlyPlayed = new JMenuItem("Clear recently played");
-        JMenuItem quitApplicationMenuItem = new JMenuItem("Quit application");
+        JMenuItem addSongMenuItem           = new JMenuItem("Add songs");
+        JMenuItem deleteSongMenuItem        = new JMenuItem("Delete selected songs");
+        JMenuItem playExternalSongMenuItem  = new JMenuItem("Play a song not in the library");
+        JMenuItem createPlaylist            = new JMenuItem("Create playlist");
+        JMenuItem deletePlaylist            = new JMenuItem("Delete selected playlist");
+        JMenuItem clearRecentlyPlayed       = new JMenuItem("Clear recently played");
+        JMenuItem quitApplicationMenuItem   = new JMenuItem("Quit application");
         
-        KeyStroke keyStroke_addSongs = KeyStroke.getKeyStroke('O', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        KeyStroke keyStroke_addSongs    = KeyStroke.getKeyStroke('O', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
         KeyStroke keyStroke_deleteSongs = KeyStroke.getKeyStroke(KeyEvent.VK_BACKSPACE, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
-        KeyStroke keyStroke_quit = KeyStroke.getKeyStroke('Q', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        KeyStroke keyStroke_quit        = KeyStroke.getKeyStroke('Q', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
         
         addSongMenuItem.setAccelerator(keyStroke_addSongs);
         deleteSongMenuItem.setAccelerator(keyStroke_deleteSongs);
@@ -1236,40 +1248,43 @@ public class View extends JFrame {
         fileMenu.add(new JSeparator());
         fileMenu.add(clearRecentlyPlayed);
         fileMenu.add(new JSeparator());
+        if(playlistWindow) {
+            JMenuItem closeWindowMenuItem = new JMenuItem("Close playlist window");
+            closeWindowMenuItem.addActionListener(new closeWindowOptionListener());
+            fileMenu.add(closeWindowMenuItem);
+        }
         fileMenu.add(quitApplicationMenuItem);
-        
         menuBar.add(fileMenu);
         
         // Setup Control menu options
-        JMenu controlMenu = new JMenu("Controls");
-        
-        JMenuItem playSong = new JMenuItem("Play");
-        JMenuItem stopSong = new JMenuItem("Stop");
-        JMenuItem nextSong = new JMenuItem("Next");
-        JMenuItem previousSong = new JMenuItem("Previous");
-        showRecentlyPlayed = new JMenu("Play Recent");
+        JMenu controlMenu       = new JMenu("Controls");
+        JMenuItem playSong      = new JMenuItem("Play");
+        JMenuItem stopSong      = new JMenuItem("Stop");
+        JMenuItem nextSong      = new JMenuItem("Next");
+        JMenuItem previousSong  = new JMenuItem("Previous");
+        showRecentlyPlayed      = new JMenu("Play Recent");
         ArrayList<String> recentlyPlayed = controller.getRecentlyPlayed();
         for(String song : recentlyPlayed) {
             JMenuItem menuSong = new JMenuItem(song);
             menuSong.addActionListener(new recentlyPlayedSongListener());
             showRecentlyPlayed.add(menuSong);
         }
-        JMenuItem goToCurrentSong = new JMenuItem("Go to Current Song");
-        JMenuItem increaseVolume = new JMenuItem("Increase Volume");
-        JMenuItem decreaseVolume = new JMenuItem("Decrease Volume");
-        shuffleOption = new JCheckBoxMenuItem("Shuffle", false);
-        repeatSongOption = new JCheckBoxMenuItem("Repeat song", false);
-        repeatPlaylistOption = new JCheckBoxMenuItem("Repeat playlist", false);
+        JMenuItem goToCurrentSong   = new JMenuItem("Go to Current Song");
+        JMenuItem increaseVolume    = new JMenuItem("Increase Volume");
+        JMenuItem decreaseVolume    = new JMenuItem("Decrease Volume");
+        shuffleOption               = new JCheckBoxMenuItem("Shuffle", false);
+        repeatSongOption            = new JCheckBoxMenuItem("Repeat song", false);
+        repeatPlaylistOption        = new JCheckBoxMenuItem("Repeat playlist", false);
 
         // Setup Control menu key accelerators
-        KeyStroke keyStroke_play = KeyStroke.getKeyStroke(' ');
-        KeyStroke keyStroke_stop = KeyStroke.getKeyStroke('.', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
-        KeyStroke keyStroke_next = KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
-        KeyStroke keyStroke_previous = KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        KeyStroke keyStroke_play        = KeyStroke.getKeyStroke(' ');
+        KeyStroke keyStroke_stop        = KeyStroke.getKeyStroke('.', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        KeyStroke keyStroke_next        = KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        KeyStroke keyStroke_previous    = KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
         KeyStroke keyStroke_currentSong = KeyStroke.getKeyStroke('L', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
         KeyStroke keyStroke_increaseVol = KeyStroke.getKeyStroke('I', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
         KeyStroke keyStroke_decreaseVol = KeyStroke.getKeyStroke('D', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
-        KeyStroke keyStroke_shuffle = KeyStroke.getKeyStroke('S', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        KeyStroke keyStroke_shuffle     = KeyStroke.getKeyStroke('S', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
         
         playSong.setAccelerator(keyStroke_play);
         stopSong.setAccelerator(keyStroke_stop);
@@ -1310,21 +1325,24 @@ public class View extends JFrame {
         volumeSlider = new JSlider(JSlider.VERTICAL, 0, 100, (int)(controller.getGain()*100));
         volumeSlider.addChangeListener(new volumeSliderListener());
         
-        JMenu volumeMenu = new JMenu("Volume");
+        JMenu volumeMenu = new JMenu();
+        volumeMenu.setIcon(volumeButtonIcon);
         volumeMenu.add(volumeSlider);
+        
+        menuBar.add(Box.createGlue());
         menuBar.add(volumeMenu);
     }
     
     public final void setupPopupMenus() {
-        songTablePopupMenu = new JPopupMenu();
-        sidePanelPopupMenu = new JPopupMenu();
-        tableHeaderPopupMenu = new JPopupMenu();
+        songTablePopupMenu      = new JPopupMenu();
+        sidePanelPopupMenu      = new JPopupMenu();
+        tableHeaderPopupMenu    = new JPopupMenu();
         
-        JMenuItem addSong = new JMenuItem("Add songs");
-        JMenuItem createPlaylistFromSelection = new JMenuItem("New Playlist from Selection");
-        JMenuItem deleteSong = new JMenuItem("Delete");
-        JMenuItem deletePlaylistMenuItem = new JMenuItem("Delete Playlist");
-        JMenuItem openInNewWindow = new JMenuItem("Open in New Window");
+        JMenuItem addSong                       = new JMenuItem("Add songs");
+        JMenuItem createPlaylistFromSelection   = new JMenuItem("New Playlist from Selection");
+        JMenuItem deleteSong                    = new JMenuItem("Delete");
+        JMenuItem deletePlaylistMenuItem        = new JMenuItem("Delete Playlist");
+        JMenuItem openInNewWindow               = new JMenuItem("Open in New Window");
         
         addSong.addActionListener(new addSongListener());
         createPlaylistFromSelection.addActionListener(new createPlaylist_AddSongsListener());
@@ -1378,11 +1396,11 @@ public class View extends JFrame {
     
     public final void setupButtons() {
         // Instantiate control buttons
-        play_pause = new JButton(playButtonIcon);
-        pause_resume = new JButton();
-        stop = new JButton();
-        previous = new JButton(previousButtonIcon);
-        next = new JButton(nextButtonIcon);
+        play_pause      = new JButton(playButtonIcon);
+        pause_resume    = new JButton();
+        stop            = new JButton();
+        previous        = new JButton(previousButtonIcon);
+        next            = new JButton(nextButtonIcon);
         
         // Add actions to control buttons
         play_pause.addActionListener(new playSongListener());
@@ -1421,8 +1439,8 @@ public class View extends JFrame {
         progressBar.setMinimum(0);
         progressBar.setValue(0);
         
-        secondsPlayedTimer = new JTextField("00:00");
-        secondsRemainingTimer = new JTextField("00:00");
+        secondsPlayedTimer      = new JTextField("00:00");
+        secondsRemainingTimer   = new JTextField("00:00");
         
         // Hide the timers initially
         secondsPlayedTimer.setVisible(false);
