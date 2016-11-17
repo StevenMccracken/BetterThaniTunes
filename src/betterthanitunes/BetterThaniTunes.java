@@ -9,14 +9,16 @@ import java.util.ArrayList;
  * @author Mark Saavedra
  */
 public class BetterThaniTunes {
+    public static boolean displayOutput;
     private static ArrayList<View> views;
     private static String dragSourcePlaylist = "";
-    
+
     public static void main(String[] args) {
+        displayOutput = false;
         views = new ArrayList<>();
         views.add(new View());
     }
-    
+
     /**
      * Method creates a new View window
      * @param title the title displayed on the top bar of the window
@@ -25,7 +27,7 @@ public class BetterThaniTunes {
     public static void createNewView(String title, Controller controller) {
         views.add(new View(title, controller));
     }
-    
+
     /**
      * Method returns a View object from the array of View objects
      * @param index the index of the View object
@@ -34,7 +36,7 @@ public class BetterThaniTunes {
     public static View getView(int index) {
         return views.get(index);
     }
-    
+
     /**
      * Method returns all Views displaying the same playlist
      * @param title the title of the window, also the playlist that window displays
@@ -48,7 +50,7 @@ public class BetterThaniTunes {
         }
         return viewsWithTitle;
     }
-    
+
     /**
      * Method returns all View objects existing
      * @return array list of View objects
@@ -56,7 +58,7 @@ public class BetterThaniTunes {
     public static ArrayList<View> getAllViews() {
         return views;
     }
-    
+
     /**
      * Method removes a View object from the array list
      * @param view the View object to be removed
@@ -64,7 +66,7 @@ public class BetterThaniTunes {
     public static void removeView(View view) {
         views.remove(view);
     }
-    
+
     /**
      * Method gets the name of the playlist that a drag of rows originated from
      * @return the name of the playlist
@@ -72,7 +74,7 @@ public class BetterThaniTunes {
     public static String getDragSourcePlaylist() {
         return dragSourcePlaylist;
     }
-    
+
     /**
      * Method sets the name of the playlist that a drag of rows originated from
      * @param source the name of the playlist
@@ -80,7 +82,7 @@ public class BetterThaniTunes {
     public static void setDragSourcePlaylist(String source) {
         dragSourcePlaylist = source;
     }
-    
+
     /**
      * Method updates the song table of all Views displaying a playlist
      * @param playlistName the playlist that needs to be updated in any windows displaying it
@@ -91,7 +93,7 @@ public class BetterThaniTunes {
                 view.updateSongTableView(view.getCurrentPlaylist());
         }
     }
-    
+
     /**
      * Method refreshes all View windows.
      */
@@ -99,14 +101,14 @@ public class BetterThaniTunes {
         for(View view : views)
             view.updateSongTableView(view.getCurrentPlaylist());
     }
-    
+
     /**
      * Method updates the first View window created.
      */
     public static void updateLibrary() {
         views.get(0).updateSongTableView("Library");
     }
-    
+
     /**
      * Method updates column headers of all Views displaying playlist.
      * @param callingView the view that updated it's column headers first

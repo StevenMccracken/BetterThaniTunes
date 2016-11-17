@@ -1,15 +1,8 @@
 package betterthanitunes;
 
+import java.util.*;
 import java.io.File;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.ArrayList;
-import java.util.Collections;
-import javazoom.jlgui.basicplayer.BasicController;
-import javazoom.jlgui.basicplayer.BasicPlayer;
-import javazoom.jlgui.basicplayer.BasicPlayerEvent;
-import javazoom.jlgui.basicplayer.BasicPlayerException;
-import javazoom.jlgui.basicplayer.BasicPlayerListener;
+import javazoom.jlgui.basicplayer.*;
 
 /**
  * Class represents an MP3 player that organizes songs
@@ -22,22 +15,22 @@ public class Controller implements BasicPlayerListener {
     private BasicController controller;
     private BasicPlayer player = new BasicPlayer();
     private DatabaseModel database;
-    
+
     private double gain = 0.5; // Volume (0.0 - 1.0)
     private long secondsPlayed = 0; // Song progression
     private int currentIndex = -1;
     private String songPlaying = "";
     private boolean repeatSong = false, repeatPlaylist = false;
-    
+
     private HashMap<String, Song> songs = new HashMap<>();
     private ArrayList<String> playOrder = new ArrayList<>();
     public static ArrayList<String> genres = new ArrayList<>();
     private ArrayList<String> recentlyPlayed = new ArrayList<>();
-	
+
     public Controller() {
     	player.addBasicPlayerListener(this);
     	controller = (BasicController)player;
-        
+
         genres.add("Hip-Hop");
         genres.add("Classical");
         genres.add("Unknown");
@@ -46,17 +39,17 @@ public class Controller implements BasicPlayerListener {
         genres.add("Electronic");
         genres.add("Dance");
         genres.add("Mix");
-        
+
         database = new DatabaseModel();
         if(!database.createConnection()) System.exit(0);
-        
+
         Object[][] songData = returnAllSongs("Library");
         for(int i = 0; i < songData.length; i++)
             songs.put(songData[i][6].toString(), new Song(songData[i][6].toString()));
-        
+
         recentlyPlayed = database.returnRecentlyPlayedSongs();
     }
-    
+
     /**
      * Method returns up to the 10 most recent songs played
      * @return an ArrayList of strings representing song titles
@@ -67,12 +60,12 @@ public class Controller implements BasicPlayerListener {
             ArrayList<String> lastTenSongs = new ArrayList<>();
             for(int i = 0; i < 10; i++)
                 lastTenSongs.add(recentlyPlayed.get(i));
-            
+
             return lastTenSongs;
         } else
             return recentlyPlayed;
     }
-    
+
     /**
      * Method adds a song to the list of recently played songs
      * @param songName the name of the song to add
@@ -81,14 +74,14 @@ public class Controller implements BasicPlayerListener {
     public boolean addToRecentlyPlayed(String songName) {
         return database.addToRecentlyPlayed(songName);
     }
-    
+
     /**
      * Method removes all songs from the recently played list.
      */
     public void clearRecentlyPlayed() {
         database.clearRecentlyPlayed();
     }
-    
+
     /**
      * Method gets the path of the current song playing
      * @return a string containing the path of the current song
@@ -96,7 +89,7 @@ public class Controller implements BasicPlayerListener {
     public String getCurrentSong() {
         return songPlaying;
     }
-    
+
     /**
      * Method gets the title of the current song playings
      * @return a string containing the title of the current song
@@ -104,7 +97,7 @@ public class Controller implements BasicPlayerListener {
     public String getCurrentSongName() {
         return ((songPlaying.length() == 0) ? "" : songs.get(songPlaying).getTitle());
     }
-    
+
     /**
      * Method updates the volume of song playback
      * @param volume the value to set the gain
@@ -113,7 +106,7 @@ public class Controller implements BasicPlayerListener {
         try {
             gain = volume;
             if(isPlayerActive()) controller.setGain(gain);
-            
+
             // Update the volume slider of all Views
             for(View view : BetterThaniTunes.getAllViews())
                 view.updateVolumeSlider(gain);
@@ -122,7 +115,7 @@ public class Controller implements BasicPlayerListener {
             e.printStackTrace();
         }
     }
-    
+
     /**
      * Method gets the volume of the controller
      * @return the gain of the volume (0.0 - 1.0)
@@ -130,7 +123,7 @@ public class Controller implements BasicPlayerListener {
     public double getGain() {
         return gain;
     }
-    
+
     /**
      * Method determines whether a song exists in the library
      * @param path the desired song to check
@@ -139,7 +132,7 @@ public class Controller implements BasicPlayerListener {
     public boolean songExists(String path) {
         return songs.containsKey(path);
     }
-    
+
     /**
      * Method maps a song's path to it's Song object so it can be referred to by any playlist
      * @param song the song to be added
@@ -154,7 +147,7 @@ public class Controller implements BasicPlayerListener {
         }
         return false;
     }
-    
+
     /**
      * Method deletes a song from a playlist
      * @param song the song to be deleted
@@ -171,7 +164,7 @@ public class Controller implements BasicPlayerListener {
         }
         return false;
     }
-    
+
     /**
      * Method updates one attribute of a song in the database
      * @param songPath the desired song to update
@@ -197,7 +190,7 @@ public class Controller implements BasicPlayerListener {
         }
         else return false;
     }
-    
+
     /**
      * Method gets a specific song from the Library
      * @param path the key of the Song object in the map
@@ -206,7 +199,7 @@ public class Controller implements BasicPlayerListener {
     public Song getSong(String path) {
         return songs.get(path);
     }
-    
+
     /**
      * Method gets all of the attributes for one row in the Songs table
      * @param path the specific row to pull from the databse
@@ -215,7 +208,7 @@ public class Controller implements BasicPlayerListener {
     public Object[] getSongData(String path) {
         return database.returnSong(path);
     }
-    
+
     /**
      * Method returns the data for all songs in a playlist from the database
      * @param playlistName the desired playlist
@@ -224,7 +217,7 @@ public class Controller implements BasicPlayerListener {
     public Object[][] returnAllSongs(String playlistName) {
         return database.returnAllSongs(playlistName);
     }
-    
+
     /**
      * Method attempts to add a playlist to the database
      * @param playlistName the name of the playlist to be inserted
@@ -233,7 +226,7 @@ public class Controller implements BasicPlayerListener {
     public boolean addPlaylist(String playlistName) {
         return database.insertPlaylist(playlistName);
     }
-    
+
     /**
      * Method attempts to delete a playlist from the database
      * @param playlistName the name of the playlist to be inserted
@@ -242,7 +235,7 @@ public class Controller implements BasicPlayerListener {
     public boolean deletePlaylist(String playlistName) {
         return database.deletePlaylist(playlistName);
     }
-    
+
     /**
      * Method returns all playlists in the database
      * @return list of playlist names
@@ -250,7 +243,7 @@ public class Controller implements BasicPlayerListener {
     public ArrayList<String> returnAllPlaylists() {
         return database.returnAllPlaylists();
     }
-    
+
     /**
      * Method sets the column visibility for a single column in a playlist
      * @param playlist the current playlist containing the column
@@ -261,7 +254,7 @@ public class Controller implements BasicPlayerListener {
     public boolean setColumnVisibility(String playlist, String column, boolean visibility) {
         return database.updateColumnVisibility(playlist, column, visibility);
     }
-    
+
     /**
      * Method gets the column visibility for all column in a playlist
      * @param playlistName the name of the playlist
@@ -270,7 +263,7 @@ public class Controller implements BasicPlayerListener {
     public boolean[] getColumnVisibility(String playlistName) {
         return database.returnColumnVisibility(playlistName);
     }
-    
+
     /**
      * Method updates the playOrder array list to contain the order of songs as they
      * appear in a playlist, so they can be iterated over for consecutive playback
@@ -281,14 +274,14 @@ public class Controller implements BasicPlayerListener {
         for(String songPath : songPaths)
             playOrder.add(songPath);
     }
-    
+
     /**
      * Method randomizes the playOrder array list.
      */
     public void shufflePlayOrder() {
         Collections.shuffle(playOrder);
     }
-    
+
     /**
      * Method updates the Shuffle menu option check/uncheck for all Views
      * @param shuffled the boolean value of the menu item
@@ -297,7 +290,7 @@ public class Controller implements BasicPlayerListener {
         for(View view : BetterThaniTunes.getAllViews())
             view.updateShuffleOption(shuffled);
     }
-    
+
     /**
      * Method plays a song
      * @param songPath the file path of the song to be opened
@@ -310,12 +303,12 @@ public class Controller implements BasicPlayerListener {
             for(View view : BetterThaniTunes.getAllViews())
                 view.updatePlayPauseButton(false);
         }
-        
-        try {  
+
+        try {
             controller.open(new File(songPath));
             controller.play();
             changeVolume(gain);
-            
+
             songPlaying = songPath;
             this.currentIndex = currentIndex;
 
@@ -328,7 +321,7 @@ public class Controller implements BasicPlayerListener {
             e.printStackTrace();
         }
     }
-    
+
     /**
      * Method pauses the song that is currently playing
      * or resumes the song that is currently paused.
@@ -352,9 +345,11 @@ public class Controller implements BasicPlayerListener {
                 e.printStackTrace();
             }
     	}
-    	else System.out.println("Nothing is playing");
+    	else {
+            if(BetterThaniTunes.displayOutput) System.out.println("Nothing is playing");
+        }
     }
-    
+
     /**
      * Method stops the current song from playing.
      */
@@ -375,9 +370,11 @@ public class Controller implements BasicPlayerListener {
                 e.printStackTrace();
             }
     	}
-    	else System.out.println("Nothing is playing");
+    	else {
+            if(BetterThaniTunes.displayOutput) System.out.println("Nothing is playing");
+        }
     }
-    
+
     /**
      * Method plays the next song in the library.
      */
@@ -416,7 +413,7 @@ public class Controller implements BasicPlayerListener {
             }
         }
     }
-    
+
     /**
      * Overridden method of nextSong method that is used solely to
      * play the next song in playOrder once a song finishes playing
@@ -452,12 +449,12 @@ public class Controller implements BasicPlayerListener {
                 }
             }
             else currentIndex++;
-            
+
             play(playOrder.get(currentIndex), currentIndex);
             return true;
         }
     }
-    
+
     /**
      * Method plays the previous song in the library.
      */
@@ -475,7 +472,7 @@ public class Controller implements BasicPlayerListener {
                     controller.open(new File(songPlaying));
                     controller.play();
                     changeVolume(gain);
-                    
+
                     // Update song area of all windows to display song info of new song
                     for(View view : BetterThaniTunes.getAllViews())
                         view.updatePlayer(new Song(songPlaying));
@@ -496,12 +493,12 @@ public class Controller implements BasicPlayerListener {
                     }
                 }
                 else currentIndex--;
-                
+
                 play(playOrder.get(currentIndex), currentIndex);
             }
         }
     }
-    
+
     /**
      * Method returns the playing status of the player
      * @return true if the player is playing. Otherwise, false
@@ -509,7 +506,7 @@ public class Controller implements BasicPlayerListener {
     public boolean isPlayerPlaying() {
         return player.getStatus() == BasicPlayer.PLAYING;
     }
-    
+
     /**
      * Method returns the paused status of the player
      * @return true if the player is paused. Otherwise, false
@@ -517,7 +514,7 @@ public class Controller implements BasicPlayerListener {
     public boolean isPlayerPaused() {
         return player.getStatus() == BasicPlayer.PAUSED;
     }
-    
+
     /**
      * Method returns the stopped status of the player
      * @return true if the player is stopped. Otherwise, false
@@ -525,7 +522,7 @@ public class Controller implements BasicPlayerListener {
     public boolean isPlayerStopped() {
         return player.getStatus() == BasicPlayer.STOPPED;
     }
-    
+
     /**
      * Method returns the active status of the player
      * @return true if the player is playing or paused. Otherwise, false
@@ -533,7 +530,7 @@ public class Controller implements BasicPlayerListener {
     public boolean isPlayerActive() {
         return isPlayerPlaying() || isPlayerPaused();
     }
-    
+
     /**
      * Method updates whether the playOrder should be repeated after reaching the last song
      * @param repeatPlaylist the value to determine if playOrder should repeat
@@ -543,7 +540,7 @@ public class Controller implements BasicPlayerListener {
         for(View view : BetterThaniTunes.getAllViews())
             view.updateRepeatPlaylistOption(repeatPlaylist);
     }
-    
+
     /**
      * Method updates whether the song should be repeated after playing
      * @param repeatSong the value to determine if the song should repeat
@@ -553,16 +550,16 @@ public class Controller implements BasicPlayerListener {
         for(View view : BetterThaniTunes.getAllViews())
             view.updateRepeatSongOption(repeatSong);
     }
-    
+
     @Override
     public void stateUpdated(BasicPlayerEvent e) {
-    	System.out.println("\nState updated: " + e.toString());
+    	if(BetterThaniTunes.displayOutput) System.out.println("\nState updated: " + e.toString());
         // If a song has just finished playing (the next button wasn't pressed)
     	if(!songPlaying.equals("") && e.toString().substring(0,3).equals("EOM")) {
-            
+
             // Wait for the player to officially stop
             while(!isPlayerStopped());
-            
+
             // Try and play the next song
             if(!nextSong(0)) {
                 // If the next song doesn't play, clear the song area of all windows
@@ -571,12 +568,13 @@ public class Controller implements BasicPlayerListener {
             }
     	}
     }
-    
+
     @Override
     public void opened(Object stream, Map properties) {
-        System.out.println("\nOpened: " + properties.toString());
+        if(BetterThaniTunes.displayOutput)
+            System.out.println("\nOpened: " + properties.toString());
     }
-    
+
     @Override
     public void progress(int bytesread, long ms, byte[] pcmdata, Map properties) {
         // Number of seconds is in microseconds, so convert it into seconds
@@ -585,12 +583,13 @@ public class Controller implements BasicPlayerListener {
         for(View view : BetterThaniTunes.getAllViews())
             view.updateProgressBar(secondsPlayed, songLength);
     }
-    
+
     @Override
     public void setController(BasicController controller) {
-    	System.out.println("\nsetController: " + controller);
+        if(BetterThaniTunes.displayOutput)
+            System.out.println("\nsetController: " + controller);
     }
-    
+
     /**
      * Method disconnects the connection to the database.
      */

@@ -1,12 +1,7 @@
 package betterthanitunes;
 
+import java.sql.*;
 import java.util.ArrayList;
-import java.sql.ResultSet;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-
 /**
  * Class represents the database that holds all songs in a user's library,
  * as well as the organization of those songs in user-created playlists.
@@ -15,7 +10,7 @@ import java.sql.PreparedStatement;
  */
 public class DatabaseModel {
     private Connection connection = null;
-    
+
     /**
      * Method establishes connection to the database so statements can be executed
      * @return true if the connection was initialized. Otherwise, false
@@ -31,7 +26,7 @@ public class DatabaseModel {
             return false;
         }
     }
-    
+
     /**
      * Method sends a query to the database, including updates, inserts, and deletes
      * @param query the statement to be executed
@@ -50,7 +45,7 @@ public class DatabaseModel {
                 else if(args[i].getClass() == Boolean.class)
                     statement.setBoolean(i+1, (boolean)args[i]);
             }
-            
+
             statement.executeUpdate();
             return true;
         } catch (SQLException e) {
@@ -58,7 +53,7 @@ public class DatabaseModel {
             return false;
         }
     }
-    
+
     /**
      * Method sends a query to the database, including selects
      * @param query the statement to be executed
@@ -77,32 +72,34 @@ public class DatabaseModel {
                 else if(args[i].getClass() == Boolean.class)
                     statement.setBoolean(i+1, (boolean)args[i]);
             }
-            
+
             return statement.executeQuery();
         } catch (SQLException e) {
             e.printStackTrace();
             return null;
         }
     }
-    
+
     /**
-     * Method inserts a playlist into the Playlists table 
+     * Method inserts a playlist into the Playlists table
      * @param playlistName the name of the playlist to be inserted
      * @return true if the playlist was inserted. False if the playlist name already exists
      */
     public boolean insertPlaylist(String playlistName) {
         if(playlistName.equals("Library") || playlistName.equals("")) {
-            System.out.println("You cannot create a playlist called " + playlistName);
+            if(BetterThaniTunes.displayOutput)
+                System.out.println("You cannot create a playlist called " + playlistName);
             return false;
         }
-        
+
         // Insert playlist name into Playlists table
         boolean wasPlaylistInserted = executeUpdate("INSERT INTO Playlists VALUES (?)", new Object[] {playlistName});
         if(!wasPlaylistInserted) {
-            System.out.println("\n" + playlistName + " already exists!");
+            if(BetterThaniTunes.displayOutput)
+                System.out.println("\n" + playlistName + " already exists!");
             return false;
         }
-        
+
         // Insert column visibility info into Columns table
         String columnInsertQuery = "INSERT INTO Columns (playlistName, columnName, visible, columnOrder) VALUES" +
                                     "('" + playlistName + "', 'Title', TRUE, 1)," +
@@ -113,18 +110,19 @@ public class DatabaseModel {
                                     "('" + playlistName + "', 'Comment', TRUE, 6)," +
                                     "('" + playlistName + "', 'Path', FALSE, 7)," +
                                     "('" + playlistName + "', 'ID', FALSE, 8)";
-        
+
         boolean wasColInfoInserted = executeUpdate(columnInsertQuery, new Object[]{});
         if(!wasColInfoInserted) {
             // Column visibility info insert failed, so delete playlist from Playlists table
-            System.out.println("\nPlaylist was inserted but column visibility setup failed!");
+            if(BetterThaniTunes.displayOutput)
+                System.out.println("\nPlaylist was inserted but column visibility setup failed!");
             boolean wasDeleted = executeUpdate("DELETE FROM Playlists WHERE playlistName = ?", new Object[] {playlistName});
-            if(wasDeleted) System.out.println("Deleted " + playlistName + " because of this error");
+            if(wasDeleted && BetterThaniTunes.displayOutput) System.out.println("Deleted " + playlistName + " because of this error");
             return false;
         }
         return true;
     }
-    
+
     /**
      * Method deletes a playlist from the Playlists table
      * @param playlistName the name of the playlist to be deleted
@@ -136,7 +134,7 @@ public class DatabaseModel {
         executeUpdate("DELETE FROM Columns WHERE playlistName = ?", playlist);
         return executeUpdate("DELETE FROM Playlists WHERE playlistName = ?", playlist);
     }
-    
+
     /**
      * Method inserts a Song object's String information into the database
      * @param song the song to be inserted
@@ -148,7 +146,7 @@ public class DatabaseModel {
         String query;
         Object[] args;
         boolean songExistsInLibrary = false;
-        
+
         if(playlistName.equals("Library")) {
             query = "INSERT INTO Songs VALUES (?,?,?,?,?,?,?)";
             args = new Object[] {song.getTitle(), song.getArtist(), song.getAlbum(), song.getYear(), song.getGenre(), song.getComment(), song.getPath()};
@@ -165,7 +163,7 @@ public class DatabaseModel {
                 e.printStackTrace();
                 return false;
             }
-            
+
             if(!songExistsInLibrary) {
                 query = "INSERT INTO Songs VALUES (?,?,?,?,?,?,?)";
                 args = new Object[] {song.getTitle(), song.getArtist(), song.getAlbum(), song.getYear(), song.getGenre(), song.getComment(), song.getPath()};
@@ -176,7 +174,7 @@ public class DatabaseModel {
                 String query2 = "SELECT MAX(id) AS ID FROM SongPlaylist WHERE playlistName = ? AND path = ?";
                 Object[] args2 = {playlistName, song.getPath()};
                 ResultSet results2 = executeQuery(query2, args2);
-                
+
                 if(results2 == null)
                     return false;
                 try {
@@ -187,19 +185,19 @@ public class DatabaseModel {
                     e.printStackTrace();
                     return false;
                 }
-                
+
             }
-            
+
             query = "INSERT INTO SongPlaylist VALUES (?,?,?)";
             args = new Object[] {playlistName, song.getPath(), id};
         }
-        
+
         boolean wasInserted = executeUpdate(query, args);
         if(songExistsInLibrary) return false;
-        if (!wasInserted) System.out.println("\nUnable to add song");
+        if (!wasInserted && BetterThaniTunes.displayOutput) System.out.println("\nUnable to add song");
         return wasInserted;
     }
-    
+
     /**
      * Method deletes a song from the database
      * @param song the song to be deleted
@@ -211,11 +209,11 @@ public class DatabaseModel {
         if(playlistName.equals("Library")) {
             ArrayList<String> playlists = new ArrayList<>();
             ResultSet results = executeQuery("SELECT playlistName FROM SongPlaylist WHERE path = ?", new Object[] {song.getPath()});
-            
+
             if(results == null)
                 return false;
             try {
-                while(results.next()) 
+                while(results.next())
                     playlists.add(results.getString("playlistName"));
             } catch(SQLException e) {
                 e.printStackTrace();
@@ -232,7 +230,7 @@ public class DatabaseModel {
             return true;
         }
     }
-    
+
     /**
      * Method updates an attribute of a row in the Songs table
      * @param path the song to update
@@ -252,7 +250,7 @@ public class DatabaseModel {
                 statement.setString(1, updatedValue.toString());
             else
                 statement.setObject(col, updatedValue);
-            
+
             statement.setString(2, path);
             statement.executeUpdate();
             return true;
@@ -261,7 +259,7 @@ public class DatabaseModel {
             return false;
         }
     }
-    
+
     /**
      * Method updates the column visibility for a column in a playlist
      * @param playlist the playlist containing the column
@@ -273,7 +271,7 @@ public class DatabaseModel {
         String query = "UPDATE Columns SET visible = ? WHERE playlistName = ? AND columnName = ?";
         return executeUpdate(query, new Object[] {visibility, playlist, column});
     }
-    
+
     /**
      * Method returns a row from the Songs table
      * @param path the desired song to select
@@ -282,7 +280,7 @@ public class DatabaseModel {
     public Object[] returnSong(String path) {
         Object[] rowData = null;
         ResultSet results = executeQuery("SELECT * FROM Songs WHERE path = ?", new Object[] {path});
-        
+
         if(results != null) {
             try {
                 if(results.next()) {
@@ -296,7 +294,7 @@ public class DatabaseModel {
         }
         return rowData;
     }
-    
+
     /**
      * Method returns all songs from the database
      * @param playlistName the name of the playlist to find songs in
@@ -311,10 +309,10 @@ public class DatabaseModel {
             ResultSet results = statement.executeQuery();
             int tableSize = 0;
             while(results.next()) tableSize = results.getInt(1);
-            
+
             // Create 2D table to be returned with correct size
             Object[][] songData = new Object[tableSize][8];
-            
+
             // Execute query again to actually get info from ResultSet
             if(!playlistName.equals("Library")) statement = connection.prepareStatement("SELECT title, artist, album, yearCreated, genre, comment, path, id FROM Songs" + additionalClause);
             else statement = connection.prepareStatement("SELECT * FROM Songs");
@@ -324,7 +322,7 @@ public class DatabaseModel {
             while(results.next()) {
                 songData[row][0] = results.getString(1);
                 songData[row][1] = results.getString(2);
-                songData[row][2] = results.getString(3); 
+                songData[row][2] = results.getString(3);
                 songData[row][3] = results.getString(4);
                 if(results.getInt(5) == -1) songData[row][4] = Controller.genres.get(2);
                 else songData[row][4] = Controller.genres.get(results.getInt(5));
@@ -332,7 +330,7 @@ public class DatabaseModel {
                 songData[row][6] = results.getString(7);
                 if(!playlistName.equals("Library")) songData[row][7] = results.getInt(8);
                 else songData[row][7] = -1;
-                
+
                 row++;
             }
             return songData;
@@ -342,7 +340,7 @@ public class DatabaseModel {
             return new Object[0][0];
         }
     }
-    
+
     /**
      * Method gets all playlist names from the database
      * @return ArrayList of strings that are the names of the playlists in the Playlists table
@@ -360,7 +358,7 @@ public class DatabaseModel {
         }
         return playlists;
     }
-    
+
     /**
      * Method returns the column visibility for a playlist from the database
      * @param playlistName the name of the playlist
@@ -381,7 +379,7 @@ public class DatabaseModel {
         }
         return columnVisibilities;
     }
-    
+
     /**
      * Method adds a song to the recently played list
      * @param songName the name of the song
@@ -391,14 +389,14 @@ public class DatabaseModel {
         String query = "INSERT INTO RecentlyPlayed (songName) VALUES (?)";
         return executeUpdate(query, new Object[]{songName});
     }
-    
+
     /**
      * Method removes all songs from the recently played list.
      */
     public void clearRecentlyPlayed() {
         executeUpdate("DELETE FROM RecentlyPlayed", new Object[]{});
     }
-    
+
     /**
      * Method returns all of the songs in the recently played list
      * @return an ArrayList of strings containing song titles
@@ -417,7 +415,7 @@ public class DatabaseModel {
         }
         return songs;
     }
-    
+
     /**
      * Method returns the size of the recently played list
      * @return an int representing the number of songs recently played
@@ -436,7 +434,7 @@ public class DatabaseModel {
         }
         return size;
     }
-    
+
     /**
      * Method closes the connection, disconnecting
      * the program from the database.
