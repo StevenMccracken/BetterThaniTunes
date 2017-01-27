@@ -49,11 +49,11 @@ public class View extends JFrame {
     private Object[][] songData;
     private boolean disableTableModelListener = false;
     private JProgressBar progressBar;
-    private final ImageIcon playButtonIcon      = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/play_song_image_small.png");
-    private final ImageIcon pauseButtonIcon     = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/pause_song_image_small.png");
-    private final ImageIcon nextButtonIcon      = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/next_song_image_small.png");
-    private final ImageIcon previousButtonIcon  = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/previous_song_image_small.png");
-    private final ImageIcon volumeButtonIcon    = new ImageIcon("/Users/stevenmccracken/Documents/GitHub/School/BetterThaniTunes/icons/volume_image_small.png");
+    private final ImageIcon playButtonIcon      = new ImageIcon("/Users/stevenmccracken/GitHub/School/BetterThaniTunes/icons/play_song_image_small.png");
+    private final ImageIcon pauseButtonIcon     = new ImageIcon("/Users/stevenmccracken/GitHub/School/BetterThaniTunes/icons/pause_song_image_small.png");
+    private final ImageIcon nextButtonIcon      = new ImageIcon("/Users/stevenmccracken/GitHub/School/BetterThaniTunes/icons/next_song_image_small.png");
+    private final ImageIcon previousButtonIcon  = new ImageIcon("/Users/stevenmccracken/GitHub/School/BetterThaniTunes/icons/previous_song_image_small.png");
+    private final ImageIcon volumeButtonIcon    = new ImageIcon("/Users/stevenmccracken/GitHub/School/BetterThaniTunes/icons/volume_image_small.png");
 
     /**
      * Default constructor creates a BetterThaniTunes
